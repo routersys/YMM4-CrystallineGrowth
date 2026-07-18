@@ -17,6 +17,30 @@ if (pipeline is null)
 var source = CreateTestImage(width, height);
 var destination = new int[source.Length];
 
+if (args.Contains("--golden"))
+{
+    var goldenCases = new (string Name, CrystallineGrowthPipeline.Parameters Parameters)[]
+    {
+        ("balanced-default", new(CrystallineGrowthQuality.Balanced, 1f, 0.6f, 0.4f, 120f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7)),
+        ("high-default", new(CrystallineGrowthQuality.High, 1f, 0.6f, 0.4f, 120f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7)),
+        ("noise-zero", new(CrystallineGrowthQuality.Balanced, 1f, 0.6f, 0.4f, 120f, 0f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 3)),
+        ("seed-42", new(CrystallineGrowthQuality.Balanced, 1f, 0.6f, 0.4f, 120f, 0.5f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 42)),
+        ("partial-freeze", new(CrystallineGrowthQuality.Balanced, 0.35f, 0.6f, 0.4f, 120f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7)),
+        ("plate", new(CrystallineGrowthQuality.Balanced, 1f, 0.1f, 0.9f, 120f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7)),
+        ("fern", new(CrystallineGrowthQuality.Balanced, 1f, 1f, 0.1f, 120f, 0.25f, 1f, 1f, 1f, 0.8f, 0.89f, 1f, 7)),
+        ("short-reach", new(CrystallineGrowthQuality.Balanced, 1f, 0.6f, 0.4f, 24f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7)),
+    };
+    foreach (var (name, goldenParameters) in goldenCases)
+    {
+        var parameters = goldenParameters;
+        pipeline.Process(source, destination, width, height, in parameters);
+        var bytes = new byte[destination.Length * sizeof(int)];
+        Buffer.BlockCopy(destination, 0, bytes, 0, bytes.Length);
+        Console.WriteLine($"{name}: {Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))}");
+    }
+    return 0;
+}
+
 foreach (var quality in new[] { CrystallineGrowthQuality.Balanced, CrystallineGrowthQuality.High, CrystallineGrowthQuality.Ultra })
 {
     var parameters = new CrystallineGrowthPipeline.Parameters(quality, 1f, 0.6f, 0.4f, 160f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7);

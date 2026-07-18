@@ -149,7 +149,6 @@ internal readonly partial struct MaskHashShader(
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct SeedInitShader(
     ReadWriteBuffer<int> mask,
-    ReadWriteBuffer<int> state,
     ReadWriteBuffer<int> birth,
     ReadWriteBuffer<float> boundaryMass,
     ReadWriteBuffer<float> crystalMass,
@@ -160,7 +159,6 @@ internal readonly partial struct SeedInitShader(
     float vaporDensity) : IComputeShader
 {
     private readonly ReadWriteBuffer<int> mask = mask;
-    private readonly ReadWriteBuffer<int> state = state;
     private readonly ReadWriteBuffer<int> birth = birth;
     private readonly ReadWriteBuffer<float> boundaryMass = boundaryMass;
     private readonly ReadWriteBuffer<float> crystalMass = crystalMass;
@@ -193,17 +191,15 @@ internal readonly partial struct SeedInitShader(
 
         if (isSeed)
         {
-            state[index] = 1;
             birth[index] = 0;
             boundaryMass[index] = 0f;
             crystalMass[index] = 1f;
-            diffusiveMass[index] = 0f;
+            diffusiveMass[index] = -1f;
             Hlsl.InterlockedAdd(ref scratch[0], 1);
             Hlsl.InterlockedMax(ref scratch[1], 0);
         }
         else
         {
-            state[index] = 0;
             birth[index] = CrystallineGrowthSettings.BirthSentinel;
             boundaryMass[index] = 0f;
             crystalMass[index] = 0f;
@@ -215,12 +211,12 @@ internal readonly partial struct SeedInitShader(
 [ThreadGroupSize(DefaultThreadGroupSizes.XY)]
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct JumpFloodSeedShader(
-    ReadWriteBuffer<int> state,
+    ReadWriteBuffer<int> birth,
     ReadWriteBuffer<int> jumpFlood,
     int gridWidth,
     int gridHeight) : IComputeShader
 {
-    private readonly ReadWriteBuffer<int> state = state;
+    private readonly ReadWriteBuffer<int> birth = birth;
     private readonly ReadWriteBuffer<int> jumpFlood = jumpFlood;
     private readonly int gridWidth = gridWidth;
     private readonly int gridHeight = gridHeight;
@@ -233,7 +229,7 @@ internal readonly partial struct JumpFloodSeedShader(
             return;
 
         var index = gy * gridWidth + gx;
-        jumpFlood[index] = state[index] == 1 ? index : -1;
+        jumpFlood[index] = birth[index] == 0 ? index : -1;
     }
 }
 
@@ -332,13 +328,11 @@ internal readonly partial struct ReachMaskShader(
 internal readonly partial struct DiffusionShader(
     ReadWriteBuffer<float> diffusiveIn,
     ReadWriteBuffer<float> diffusiveOut,
-    ReadWriteBuffer<int> state,
     int gridWidth,
     int gridHeight) : IComputeShader
 {
     private readonly ReadWriteBuffer<float> diffusiveIn = diffusiveIn;
     private readonly ReadWriteBuffer<float> diffusiveOut = diffusiveOut;
-    private readonly ReadWriteBuffer<int> state = state;
     private readonly int gridWidth = gridWidth;
     private readonly int gridHeight = gridHeight;
 
@@ -350,23 +344,26 @@ internal readonly partial struct DiffusionShader(
             return;
 
         var index = gy * gridWidth + gx;
-        if (state[index] == 1)
+        var self = diffusiveIn[index];
+        if (self < 0f)
         {
-            diffusiveOut[index] = 0f;
+            diffusiveOut[index] = -1f;
             return;
         }
 
-        var self = diffusiveIn[index];
         var sum = self;
         var parity = gy & 1;
         for (var neighbor = 0; neighbor < 6; neighbor++)
         {
             var nx = gx + CrystallineGrowthShaderMath.NeighborDx(neighbor, parity);
             var ny = gy + CrystallineGrowthShaderMath.NeighborDy(neighbor);
-            if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight || state[ny * gridWidth + nx] == 1)
+            if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight)
+            {
                 sum += self;
-            else
-                sum += diffusiveIn[ny * gridWidth + nx];
+                continue;
+            }
+            var neighborValue = diffusiveIn[ny * gridWidth + nx];
+            sum += neighborValue < 0f ? self : neighborValue;
         }
         diffusiveOut[index] = sum * (1f / 7f);
     }
@@ -379,8 +376,6 @@ internal readonly partial struct GrowthUpdateShader(
     ReadWriteBuffer<float> diffusiveOut,
     ReadWriteBuffer<float> boundaryMass,
     ReadWriteBuffer<float> crystalMass,
-    ReadWriteBuffer<int> stateIn,
-    ReadWriteBuffer<int> stateOut,
     ReadWriteBuffer<int> birth,
     ReadWriteBuffer<int> reachMask,
     ReadWriteBuffer<int> scratch,
@@ -400,8 +395,6 @@ internal readonly partial struct GrowthUpdateShader(
     private readonly ReadWriteBuffer<float> diffusiveOut = diffusiveOut;
     private readonly ReadWriteBuffer<float> boundaryMass = boundaryMass;
     private readonly ReadWriteBuffer<float> crystalMass = crystalMass;
-    private readonly ReadWriteBuffer<int> stateIn = stateIn;
-    private readonly ReadWriteBuffer<int> stateOut = stateOut;
     private readonly ReadWriteBuffer<int> birth = birth;
     private readonly ReadWriteBuffer<int> reachMask = reachMask;
     private readonly ReadWriteBuffer<int> scratch = scratch;
@@ -425,10 +418,10 @@ internal readonly partial struct GrowthUpdateShader(
             return;
 
         var index = gy * gridWidth + gx;
-        if (stateIn[index] == 1)
+        var diffusive = diffusiveMid[index];
+        if (diffusive < 0f)
         {
-            stateOut[index] = 1;
-            diffusiveOut[index] = 0f;
+            diffusiveOut[index] = -1f;
             return;
         }
 
@@ -441,18 +434,17 @@ internal readonly partial struct GrowthUpdateShader(
             var ny = gy + CrystallineGrowthShaderMath.NeighborDy(neighbor);
             if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight)
                 continue;
-            var neighborIndex = ny * gridWidth + nx;
-            if (stateIn[neighborIndex] == 1)
+            var neighborValue = diffusiveMid[ny * gridWidth + nx];
+            if (neighborValue < 0f)
                 attachedNeighbors++;
             else
-                neighborDiffusive += diffusiveMid[neighborIndex];
+                neighborDiffusive += neighborValue;
         }
 
-        var diffusive = diffusiveMid[index];
-        var boundary = boundaryMass[index];
-        var crystal = crystalMass[index];
         if (attachedNeighbors > 0)
         {
+            var boundary = boundaryMass[index];
+            var crystal = crystalMass[index];
             boundary += (1f - kappa) * diffusive;
             crystal += kappa * diffusive;
             diffusive = 0f;
@@ -467,19 +459,18 @@ internal readonly partial struct GrowthUpdateShader(
 
             if (attach && reachMask[index] == 1)
             {
-                stateOut[index] = 1;
                 birth[index] = step + 1;
                 crystalMass[index] = crystal + boundary;
                 boundaryMass[index] = 0f;
-                diffusiveOut[index] = 0f;
+                diffusiveOut[index] = -1f;
                 Hlsl.InterlockedAdd(ref scratch[0], 1);
                 Hlsl.InterlockedMax(ref scratch[1], step + 1);
                 return;
             }
 
             diffusive += mu * boundary + gamma * crystal;
-            boundary *= 1f - mu;
-            crystal *= 1f - gamma;
+            boundaryMass[index] = boundary * (1f - mu);
+            crystalMass[index] = crystal * (1f - gamma);
         }
 
         if (sigma > 0f)
@@ -488,9 +479,6 @@ internal readonly partial struct GrowthUpdateShader(
             diffusive *= noise < 0.5f ? 1f - sigma : 1f + sigma;
         }
 
-        stateOut[index] = 0;
-        boundaryMass[index] = boundary;
-        crystalMass[index] = crystal;
         diffusiveOut[index] = diffusive;
     }
 }

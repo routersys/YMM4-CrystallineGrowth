@@ -13,8 +13,6 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     private readonly int[] _boundsMaxX;
     private readonly int[] _boundsMaxY;
     private ReadWriteBuffer<int>? _mask;
-    private ReadWriteBuffer<int>? _stateA;
-    private ReadWriteBuffer<int>? _stateB;
     private ReadWriteBuffer<int>? _birth;
     private ReadWriteBuffer<int>? _reachMask;
     private ReadWriteBuffer<int>? _jumpFloodA;
@@ -260,15 +258,14 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         context.For(1, new InitScratchShader(_scratch));
         context.Barrier(_scratch);
         context.For(gridWidth, gridHeight, new SeedInitShader(
-            mask, _stateA!, birth, boundaryMass, crystalMass, _diffusiveA!, _scratch, gridWidth, gridHeight, derived.VaporDensity));
-        context.Barrier(_stateA!);
+            mask, birth, boundaryMass, crystalMass, _diffusiveA!, _scratch, gridWidth, gridHeight, derived.VaporDensity));
         context.Barrier(birth);
         context.Barrier(boundaryMass);
         context.Barrier(crystalMass);
         context.Barrier(_diffusiveA!);
         context.Barrier(_scratch);
 
-        context.For(gridWidth, gridHeight, new JumpFloodSeedShader(_stateA!, _jumpFloodA!, gridWidth, gridHeight));
+        context.For(gridWidth, gridHeight, new JumpFloodSeedShader(birth, _jumpFloodA!, gridWidth, gridHeight));
         context.Barrier(_jumpFloodA!);
         var reading = _jumpFloodA!;
         var writing = _jumpFloodB!;
@@ -287,22 +284,18 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         context.For(gridWidth, gridHeight, new ReachMaskShader(reading, reachMask, gridWidth, gridHeight, derived.CellSize, derived.ReachPixels));
         context.Barrier(reachMask);
 
-        var stateRead = _stateA!;
-        var stateWrite = _stateB!;
         for (var step = 0; step < derived.Steps; step++)
         {
-            context.For(gridWidth, gridHeight, new DiffusionShader(_diffusiveA!, _diffusiveB!, stateRead, gridWidth, gridHeight));
+            context.For(gridWidth, gridHeight, new DiffusionShader(_diffusiveA!, _diffusiveB!, gridWidth, gridHeight));
             context.Barrier(_diffusiveB!);
             context.For(gridWidth, gridHeight, new GrowthUpdateShader(
-                _diffusiveB!, _diffusiveA!, boundaryMass, crystalMass, stateRead, stateWrite, birth, reachMask, _scratch,
+                _diffusiveB!, _diffusiveA!, boundaryMass, crystalMass, birth, reachMask, _scratch,
                 gridWidth, gridHeight, step, parameters.Seed,
                 CrystallineGrowthSettings.Kappa, derived.Beta, CrystallineGrowthSettings.Alpha, CrystallineGrowthSettings.Theta,
                 CrystallineGrowthSettings.Mu, CrystallineGrowthSettings.Gamma, derived.Sigma));
             context.Barrier(_diffusiveA!);
-            context.Barrier(stateWrite);
             context.Barrier(boundaryMass);
             context.Barrier(crystalMass);
-            (stateRead, stateWrite) = (stateWrite, stateRead);
         }
         context.Barrier(birth);
         context.Barrier(_scratch);
@@ -404,8 +397,6 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         DisposeGridBuffers();
         var gridLength = gridWidth * gridHeight;
         _mask = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _stateA = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _stateB = _device.AllocateReadWriteBuffer<int>(gridLength);
         _birth = _device.AllocateReadWriteBuffer<int>(gridLength);
         _reachMask = _device.AllocateReadWriteBuffer<int>(gridLength);
         _jumpFloodA = _device.AllocateReadWriteBuffer<int>(gridLength);
@@ -438,8 +429,6 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     private void DisposeGridBuffers()
     {
         _mask?.Dispose();
-        _stateA?.Dispose();
-        _stateB?.Dispose();
         _birth?.Dispose();
         _reachMask?.Dispose();
         _jumpFloodA?.Dispose();
@@ -450,8 +439,6 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _diffusiveB?.Dispose();
         _birthReadBack?.Dispose();
         _mask = null;
-        _stateA = null;
-        _stateB = null;
         _birth = null;
         _reachMask = null;
         _jumpFloodA = null;

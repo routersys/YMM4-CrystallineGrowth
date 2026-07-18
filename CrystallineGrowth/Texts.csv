@@ -1,0 +1,39 @@
+Key,Parameter,ja-jp,en-us,zh-cn,zh-tw,ko-kr,es-es,ar-sa,id-id
+CrystallineGrowth,,氷晶成長,Crystalline Growth,冰晶生长,冰晶生長,빙정 성장,Crecimiento de cristales de hielo,نمو البلورات الجليدية,Pertumbuhan Kristal Es
+BasicGroup,,基本,Basic,基本,基本,기본,Básico,أساسي,Dasar
+GrowthGroup,,成長,Growth,生长,生長,성장,Crecimiento,النمو,Pertumbuhan
+AppearanceGroup,,描画,Appearance,绘制,繪製,묘화,Apariencia,المظهر,Tampilan
+Amount,,強さ,Amount,强度,強度,강도,Intensidad,الشدة,Intensitas
+AmountDescription,,氷の合成量です,Blend amount of the ice over the source,冰与源图像的混合量,冰與源圖像的混合量,얼음의 합성량입니다,Cantidad de mezcla del hielo sobre la imagen,مقدار مزج الجليد فوق الصورة,Jumlah pencampuran es di atas citra
+Freeze,,凍結度,Freeze,冻结度,凍結度,동결도,Congelación,درجة التجمد,Pembekuan
+FreezeDescription,,霜の広がり具合です。素材の縁から凍りついていきます,Progress of the frost. It freezes over from the edges of the source,霜的扩展程度。从素材边缘开始冻结,霜的擴展程度。從素材邊緣開始凍結,서리가 퍼지는 정도입니다. 소재 가장자리부터 얼어붙습니다,Progreso de la escarcha. Se congela desde los bordes de la imagen,مدى انتشار الصقيع. يتجمد من حواف الصورة,Kemajuan embun beku. Membeku dari tepi sumber
+Quality,,品質,Quality,品质,品質,품질,Calidad,الجودة,Kualitas
+QualityDescription,,成長格子の解像度と成長ステップ数を選びます,Selects the growth grid resolution and step counts,选择生长网格分辨率与步数,選擇生長網格解析度與步數,성장 격자 해상도와 스텝 수를 선택합니다,Selecciona la resolución de la cuadrícula de crecimiento y el número de pasos,يحدد دقة شبكة النمو وعدد الخطوات,Memilih resolusi kisi pertumbuhan dan jumlah langkah
+Branching,,樹枝化,Branching,树枝化,樹枝化,수지화,Ramificación,التفرع,Percabangan
+BranchingDescription,,水蒸気の密度です。高いほど樹枝状に枝分かれします,Density of the vapor. Higher values branch into dendritic shapes,水蒸气密度。数值越高越呈树枝状分支,水蒸氣密度。數值越高越呈樹枝狀分支,수증기의 밀도입니다. 높을수록 수지상으로 가지를 칩니다,Densidad del vapor. Valores altos se ramifican en formas dendríticas,كثافة بخار الماء. القيم الأعلى تتفرع بأشكال شجيرية,Kepadatan uap air. Nilai tinggi bercabang berbentuk dendritik
+Facet,,ファセット,Facet,晶面,晶面,패싯,Facetado,التسطح البلوري,Faset
+FacetDescription,,付着の異方性です。高いほど結晶面が平らに揃います,Anisotropy of attachment. Higher values form flat crystal facets,附着的各向异性。数值越高晶面越平整,附著的異向性。數值越高晶面越平整,부착의 이방성입니다. 높을수록 결정면이 평평하게 정렬됩니다,Anisotropía de adhesión. Valores altos forman facetas cristalinas planas,تباين الالتصاق. القيم الأعلى تشكل أوجهًا بلورية مستوية,Anisotropi perlekatan. Nilai tinggi membentuk faset kristal yang datar
+Reach,,到達距離,Reach,到达距离,到達距離,도달 거리,Alcance,المدى,Jangkauan
+ReachDescription,,縁から霜が広がる距離です。素材の長辺に対する割合で指定します,Distance the frost spreads from the edge as a ratio of the longer side of the source,霜从边缘扩展的距离。以素材长边的比例指定,霜從邊緣擴展的距離。以素材長邊的比例指定,가장자리에서 서리가 퍼지는 거리입니다. 소재 긴 변에 대한 비율로 지정합니다,Distancia que se extiende la escarcha desde el borde como proporción del lado más largo de la fuente,المسافة التي ينتشر بها الصقيع من الحافة كنسبة من الضلع الأطول للمصدر,Jarak penyebaran embun beku dari tepi sebagai rasio sisi terpanjang sumber
+Noise,,ゆらぎ,Noise,扰动,擾動,요동,Fluctuación,التذبذب,Fluktuasi
+NoiseDescription,,水蒸気のゆらぎです。シード値ごとに結晶の形が変わります,Fluctuation of the vapor. The crystal shape varies with the seed value,水蒸气的扰动。晶体形状随种子值变化,水蒸氣的擾動。晶體形狀隨種子值變化,수증기의 요동입니다. 시드 값에 따라 결정의 형태가 달라집니다,Fluctuación del vapor. La forma del cristal varía con el valor de la semilla,تذبذب بخار الماء. يتغير شكل البلورة حسب قيمة البذرة,Fluktuasi uap air. Bentuk kristal berubah sesuai nilai seed
+Seed,,シード,Seed,种子,種子,시드,Semilla,البذرة,Seed
+SeedDescription,,結晶の形を決める固定値です,A fixed value that determines the crystal shape,决定晶体形状的固定值,決定晶體形狀的固定值,결정의 형태를 결정하는 고정값입니다,Valor fijo que determina la forma del cristal,قيمة ثابتة تحدد شكل البلورة,Nilai tetap yang menentukan bentuk kristal
+Frost,,白濁,Frost,白浊,白濁,백탁,Escarcha,التعكر الأبيض,Kabut Putih
+FrostDescription,,氷の白濁の強さです,Strength of the white frosting of the ice,冰的白浊强度,冰的白濁強度,얼음이 하얗게 흐려지는 정도입니다,Intensidad del velo blanco del hielo,شدة التعكر الأبيض للجليد,Kekuatan kabut putih pada es
+Refraction,,屈折,Refraction,折射,折射,굴절,Refracción,الانكسار,Refraksi
+RefractionDescription,,氷を通した背景の歪みの強さです,Strength of the background distortion through the ice,透过冰的背景扭曲强度,透過冰的背景扭曲強度,얼음을 통한 배경 왜곡의 강도입니다,Intensidad de la distorsión del fondo a través del hielo,شدة تشوه الخلفية عبر الجليد,Kekuatan distorsi latar melalui es
+Specular,,光沢,Specular,光泽,光澤,광택,Brillo,اللمعان,Kilau
+SpecularDescription,,氷の表面に映る光の強さです,Strength of the light reflected on the ice surface,冰面反射光的强度,冰面反射光的強度,얼음 표면에 비치는 빛의 강도입니다,Intensidad de la luz reflejada en la superficie del hielo,شدة الضوء المنعكس على سطح الجليد,Kekuatan cahaya yang terpantul pada permukaan es
+IceColor,,色,Color,颜色,顏色,색,Color,اللون,Warna
+IceColorDescription,,氷の色です,Color of the ice,冰的颜色,冰的顏色,얼음의 색입니다,Color del hielo,لون الجليد,Warna es
+QualityBalanced,,標準,Balanced,标准,標準,표준,Estándar,قياسي,Standar
+QualityBalancedDescription,,格子解像度とステップ数を抑えた設定です,Uses reduced grid resolution and step counts,降低网格分辨率与步数的设置,降低網格解析度與步數的設定,격자 해상도와 스텝 수를 줄인 설정입니다,Configuración con resolución de cuadrícula y pasos reducidos,إعداد بدقة شبكة وعدد خطوات مخفضين,Pengaturan dengan resolusi kisi dan langkah yang dikurangi
+QualityHigh,,高品質,High,高品质,高品質,고품질,Alta,عالية,Tinggi
+QualityHighDescription,,品質と処理量の基準設定です,The reference balance of quality and cost,品质与处理量的基准设置,品質與處理量的基準設定,품질과 처리량의 기준 설정입니다,Configuración de referencia entre calidad y coste,الإعداد المرجعي للتوازن بين الجودة والتكلفة,Pengaturan acuan antara kualitas dan beban proses
+QualityUltra,,最高品質,Ultra,最高品质,最高品質,최고 품질,Máxima,قصوى,Ultra
+QualityUltraDescription,,最大の格子解像度とステップ数を使用します,Uses the largest grid resolution and step counts,使用最大的网格分辨率与步数,使用最大的網格解析度與步數,최대 격자 해상도와 스텝 수를 사용합니다,Usa la mayor resolución de cuadrícula y el mayor número de pasos,يستخدم أكبر دقة شبكة وأكبر عدد من الخطوات,Menggunakan resolusi kisi dan jumlah langkah terbesar
+TagIce,,氷,Ice,冰,冰,얼음,Hielo,جليد,Es
+TagFrost,,霜,Frost,霜,霜,서리,Escarcha,صقيع,Embun beku
+TagFreeze,,凍結,Freeze,冻结,凍結,동결,Congelación,تجمد,Pembekuan
+UpdateAvailableMessage,,新しいバージョン {0} が公開されています。,A new version {0} is available.,新版本 {0} 已发布。,新版本 {0} 已發布。,새 버전 {0}이(가) 공개되었습니다.,La nueva versión {0} ya está disponible.,تم إصدار نسخة جديدة {0}.,Versi baru {0} telah dirilis.

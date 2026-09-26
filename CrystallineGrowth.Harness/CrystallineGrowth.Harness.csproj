@@ -59,6 +59,4 @@
     </Reference>
   </ItemGroup>
 
-  <Import Project="..\CrystallineGrowth\ComputeSharp.Reference.props" />
-
 </Project>

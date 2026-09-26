@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Packaging;
 using System.Security.Cryptography;
-using ComputeSharp;
+using ComputeWeave;
 using CrystallineGrowth;
 using CrystallineGrowth.Harness;
 using SharpGen.Runtime;

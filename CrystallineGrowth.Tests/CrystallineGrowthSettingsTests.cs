@@ -69,13 +69,4 @@ public sealed class CrystallineGrowthSettingsTests
     [InlineData(2f, CrystallineGrowthSettings.MaximumSigma)]
     public void TheNoiseStaysWithinItsRange(float noise, float expected)
         => Assert.Equal(expected, CrystallineGrowthSettings.GetNoiseSigma(noise), 7);
-
-    [Theory]
-    [InlineData(1, 1, 1)]
-    [InlineData(2, 2, 1)]
-    [InlineData(3, 3, 2)]
-    [InlineData(256, 128, 8)]
-    [InlineData(257, 16, 9)]
-    public void TheJumpFloodPassesCoverTheLongSide(int width, int height, int expected)
-        => Assert.Equal(expected, CrystallineGrowthSettings.GetJumpFloodPassCount(width, height));
 }

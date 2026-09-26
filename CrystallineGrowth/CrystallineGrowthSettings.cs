@@ -62,18 +62,5 @@ internal static class CrystallineGrowthSettings
     public static float GetNoiseSigma(float noise)
         => Math.Clamp(noise, 0f, 1f) * MaximumSigma;
 
-    public static int GetJumpFloodPassCount(int width, int height)
-    {
-        var maxSide = Math.Max(Math.Max(width, height), 1);
-        var count = 0;
-        var step = 1;
-        while (step < maxSide)
-        {
-            step <<= 1;
-            count++;
-        }
-        return Math.Max(count, 1);
-    }
-
     internal readonly record struct QualitySettings(int GridResolution, int MaxSteps);
 }

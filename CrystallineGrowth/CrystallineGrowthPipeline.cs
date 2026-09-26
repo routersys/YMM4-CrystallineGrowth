@@ -170,7 +170,14 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         if (_structureKey == key)
             return false;
 
-        _host.RecordGrowth(_scratch, _birth!, _gridWidth, _gridHeight, in derived, in parameters).Wait();
+        _ = _host.RecordGrowthSetup(_scratch, _birth!, _gridWidth, _gridHeight, in derived);
+        var grown = default(ComputeSubmission);
+        for (var firstStep = 0; firstStep < derived.Steps; firstStep += CrystallineGrowthSettings.GrowthStepsPerSubmission)
+        {
+            var stepCount = Math.Min(CrystallineGrowthSettings.GrowthStepsPerSubmission, derived.Steps - firstStep);
+            grown = _host.RecordGrowthSteps(_scratch, _birth!, _gridWidth, _gridHeight, in derived, in parameters, firstStep, stepCount);
+        }
+        grown.Wait();
         _scratchReadBack.CopyFrom(_scratch);
         var birthReadBack = _birthReadBack!;
         birthReadBack.CopyFrom(_birth!);

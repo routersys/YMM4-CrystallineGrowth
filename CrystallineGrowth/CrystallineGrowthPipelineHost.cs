@@ -56,7 +56,8 @@ internal sealed partial class CrystallineGrowthPipelineHost
         _ = _device;
 
         RecordSilhouetteStage(in context, grid, source, 0, 0, width, height, gridWidth, gridHeight, in derived);
-        RecordGrowthStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived, in parameters);
+        RecordGrowthSetupStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived);
+        RecordGrowthStepsStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived, in parameters, 0, derived.Steps);
         RecordRenderStage(in context, grid, source, output, scratch, birth, new CrystallineGrowthPipeline.PixelRect(0, 0, width, height), 0, 0, width, height, gridWidth, gridHeight, in derived, in parameters);
     }
 
@@ -128,7 +129,22 @@ internal sealed partial class CrystallineGrowthPipelineHost
     }
 
     [ComputePipeline]
-    private void RecordGrowth(
+    private void RecordGrowthSetup(
+        in ComputeContext context,
+        [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> birth,
+        int gridWidth,
+        int gridHeight,
+        in CrystallineGrowthPipeline.DerivedValues derived)
+    {
+        _ = _device;
+
+        RecordGrowthSetupStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived);
+    }
+
+    [ComputePipeline]
+    private void RecordGrowthSteps(
         in ComputeContext context,
         [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
@@ -136,11 +152,13 @@ internal sealed partial class CrystallineGrowthPipelineHost
         int gridWidth,
         int gridHeight,
         in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int firstStep,
+        int stepCount)
     {
         _ = _device;
 
-        RecordGrowthStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived, in parameters);
+        RecordGrowthStepsStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived, in parameters, firstStep, stepCount);
     }
 
     [ComputePipeline]
@@ -209,15 +227,14 @@ internal sealed partial class CrystallineGrowthPipelineHost
         context.Barrier(scratch);
     }
 
-    private static void RecordGrowthStage(
+    private static void RecordGrowthSetupStage(
         in ComputeContext context,
         CrystallineGrowthGridResources grid,
         ReadWriteBuffer<int> scratch,
         ReadWriteBuffer<int> birth,
         int gridWidth,
         int gridHeight,
-        in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.DerivedValues derived)
     {
         context.For(1, new InitScratchShader(scratch));
         context.Barrier(scratch);
@@ -247,8 +264,21 @@ internal sealed partial class CrystallineGrowthPipelineHost
         }
         context.For(gridWidth, gridHeight, new ReachMaskShader(reading, grid.ReachMask, gridWidth, gridHeight, derived.CellSize, derived.ReachPixels));
         context.Barrier(grid.ReachMask);
+    }
 
-        for (var step = 0; step < derived.Steps; step++)
+    private static void RecordGrowthStepsStage(
+        in ComputeContext context,
+        CrystallineGrowthGridResources grid,
+        ReadWriteBuffer<int> scratch,
+        ReadWriteBuffer<int> birth,
+        int gridWidth,
+        int gridHeight,
+        in CrystallineGrowthPipeline.DerivedValues derived,
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int firstStep,
+        int stepCount)
+    {
+        for (var step = firstStep; step < firstStep + stepCount; step++)
         {
             context.For(gridWidth, gridHeight, new DiffusionShader(grid.DiffusiveA, grid.DiffusiveB, gridWidth, gridHeight));
             context.Barrier(grid.DiffusiveB);

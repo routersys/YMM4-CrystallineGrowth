@@ -522,7 +522,7 @@ public sealed class CrystallineGrowthEffectTests
     }
 
     [Fact]
-    public void Direct2DInteropProducesFrostFromOpaqueCore()
+    public void Direct2DInteropProducesFrostAfterGrowingFullHdOutput()
     {
         using var devices = new GraphicsDevices();
         using var graphicsContext = devices.CreateContext();
@@ -541,6 +541,8 @@ public sealed class CrystallineGrowthEffectTests
 
         const int width = 96;
         const int height = 96;
+        const int fullHdWidth = 1920;
+        const int fullHdHeight = 1080;
         var pixels = CreateSquareSource(width, height, 32, 32, 32, 32);
         var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         using var inputBitmap = graphicsContext.DeviceContext.CreateBitmap(
@@ -585,14 +587,24 @@ public sealed class CrystallineGrowthEffectTests
             pipeline!.Simulate(
                 resourceSet.GetSourceComputeBinding(), width, height, 0, 0, width, height, in parameters);
             Assert.True(pipeline.TryGetVisibleBounds(width, height, in parameters, out visible));
-            Assert.True(resourceSet.TryEnsureOutput(visible.Width, visible.Height, out _));
+            Assert.True(resourceSet.TryEnsureOutput(
+                iteration == 0 ? visible.Width : fullHdWidth,
+                iteration == 0 ? visible.Height : fullHdHeight,
+                out _));
             pipeline.RenderVisible(
                 resourceSet.GetSourceComputeBinding(), resourceSet.GetOutputComputeBinding(), width, height, 0, 0, width, height, visible, in parameters);
+
+            if (iteration == 0)
+            {
+                using var retiredLease = resourceSet.AcquireOutputExternalViewLease();
+                Assert.Equal(visible.Width, retiredLease.Width);
+                Assert.Equal(visible.Height, retiredLease.Height);
+            }
         }
 
         using var outputLease = resourceSet.AcquireOutputExternalViewLease();
-        Assert.Equal(visible.Width, outputLease.Width);
-        Assert.Equal(visible.Height, outputLease.Height);
+        Assert.Equal(fullHdWidth, outputLease.Width);
+        Assert.Equal(fullHdHeight, outputLease.Height);
         using var staging = graphicsContext.DeviceContext.CreateBitmap(
             new SizeI(visible.Width, visible.Height),
             new BitmapProperties1(
@@ -601,7 +613,7 @@ public sealed class CrystallineGrowthEffectTests
                 96f,
                 BitmapOptions.CpuRead | BitmapOptions.CannotDraw));
         using var outputBitmap = new ID2D1Bitmap1(outputLease.DangerousGetView().AddRefBitmap());
-        staging.CopyFromBitmap(outputBitmap);
+        staging.CopyFromBitmap(Vortice.Mathematics.Int2.Zero, outputBitmap, new RectI(0, 0, visible.Width, visible.Height));
         var mapped = staging.Map(MapOptions.Read);
         try
         {

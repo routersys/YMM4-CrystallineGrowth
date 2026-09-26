@@ -34,6 +34,8 @@ internal static class CrystallineGrowthSettings
     public const int ScratchSourceHashSum = 8;
     public const int ScratchSourceHashMix = 9;
     public const int MaximumPendingSubmissions = 32;
+    public const int GrowthGroupWidth = 32;
+    public const int GrowthGroupHeight = 2;
 
     public static QualitySettings GetQuality(CrystallineGrowthQuality quality)
         => quality switch

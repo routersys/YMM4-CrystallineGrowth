@@ -382,7 +382,7 @@ internal readonly partial struct ReachMaskShader(
     }
 }
 
-[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[ThreadGroupSize(CrystallineGrowthSettings.GrowthGroupWidth, CrystallineGrowthSettings.GrowthGroupHeight, 1)]
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct DiffusionShader(
     ReadWriteBuffer<float> diffusiveIn,
@@ -428,7 +428,7 @@ internal readonly partial struct DiffusionShader(
     }
 }
 
-[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[ThreadGroupSize(CrystallineGrowthSettings.GrowthGroupWidth, CrystallineGrowthSettings.GrowthGroupHeight, 1)]
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct GrowthUpdateShader(
     ReadWriteBuffer<float> diffusiveMid,

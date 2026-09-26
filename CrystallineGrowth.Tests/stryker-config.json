@@ -1,0 +1,22 @@
+{
+  "stryker-config": {
+    "project": "CrystallineGrowth.csproj",
+    "test-runner": "mtp",
+    "coverage-analysis": "off",
+    "mutate": [
+      "**/*.cs",
+      "!**/YMM4-GitHubUpdateNotifier/**",
+      "!**/CrystallineGrowthUpdateNotifier.cs"
+    ],
+    "reporters": [
+      "progress",
+      "cleartext",
+      "html"
+    ],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 60
+    }
+  }
+}

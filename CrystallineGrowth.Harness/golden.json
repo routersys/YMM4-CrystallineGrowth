@@ -1,0 +1,170 @@
+{
+  "adapter": "Intel(R) Iris(R) Xe Graphics",
+  "driver": "32.0.101.7085",
+  "input": "synthetic 640x480 89838D8976198E40",
+  "canvas": "1280x720",
+  "cases": [
+    {
+      "name": "default",
+      "frames": [
+        0
+      ],
+      "hash": "210C12219713DE34867BC8CF9F78A58767396AEBC87FCFE0A1B04EFB22C6C7F4"
+    },
+    {
+      "name": "default-frames-0-8",
+      "frames": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "hash": "8AF8E9DB2C66DCFE5B8E0A1E0B17D13A02EB0DECBA383767E8DBD04D6F53143A"
+    },
+    {
+      "name": "amount-0",
+      "frames": [
+        0
+      ],
+      "hash": "0A700F76CEDDBAD7C4B6A2C19D46939C1A93940E86C6EFEF1E5A53DB48D2A020"
+    },
+    {
+      "name": "freeze-35",
+      "frames": [
+        0
+      ],
+      "hash": "28E31C3C654681F9DEC715B77EA9DAE94B12A747E45137123E2544D1544AA624"
+    },
+    {
+      "name": "quality-balanced",
+      "frames": [
+        0
+      ],
+      "hash": "F52B24AC4C97AA4BECAB5244748B74614902316E410DE339B3CABBCCE375705F"
+    },
+    {
+      "name": "quality-ultra",
+      "frames": [
+        0
+      ],
+      "hash": "4F764786416A7256A0F2416969A9F38E1A229AB3CEEB8600D41E148047AB18BF"
+    },
+    {
+      "name": "branching-0",
+      "frames": [
+        0
+      ],
+      "hash": "B9B41301B660EEED1AD52416782F641CD9E8078D804F12AF91056DC27AB50070"
+    },
+    {
+      "name": "branching-100",
+      "frames": [
+        0
+      ],
+      "hash": "DCB5160636A3683133909F6715688342926F2AF70045E060F8DA7732B3EFC160"
+    },
+    {
+      "name": "facet-0",
+      "frames": [
+        0
+      ],
+      "hash": "82A8C571BE22FC35CC8DD949B81D0F2C5D147EC5C114232C1A47FF21C3646D29"
+    },
+    {
+      "name": "facet-100",
+      "frames": [
+        0
+      ],
+      "hash": "FCDF06EF5FC74ABD3E917E2EB8EFFBA2743883891FCE0EE0122E9E1909E3CEBD"
+    },
+    {
+      "name": "reach-5",
+      "frames": [
+        0
+      ],
+      "hash": "21D53360473EE6D20C3A33DE3E3CEA187C76B35F5CF0E19EE867C0DD924C51AA"
+    },
+    {
+      "name": "reach-100",
+      "frames": [
+        0
+      ],
+      "hash": "8E10427FDDC041C96C24455C983F99689B9453379A22CF17AE8A74FC65871D7B"
+    },
+    {
+      "name": "noise-0",
+      "frames": [
+        0
+      ],
+      "hash": "8646E1A2A020990AA90DFF180E4C157ED7CA957E2DEE2E0DD935BCEEA54D15BD"
+    },
+    {
+      "name": "noise-100",
+      "frames": [
+        0
+      ],
+      "hash": "AA8B002F93AE3B6BFB1790337B8BC6538C90DA574853CA1150C8B15059E4F338"
+    },
+    {
+      "name": "frost-0",
+      "frames": [
+        0
+      ],
+      "hash": "D2C2C8A028A5DABD41986967B015F942932783F477C590ED450EC0DAD6348D79"
+    },
+    {
+      "name": "frost-100",
+      "frames": [
+        0
+      ],
+      "hash": "A154469F100620089380470266B9C081A1D07C3AE4953803E8948FF077959B9E"
+    },
+    {
+      "name": "refraction-0",
+      "frames": [
+        0
+      ],
+      "hash": "C42D5AFFD77E1F6B98A0CEAD762C899156332E8EEE0E3DDDF1F5A8F8998B9E40"
+    },
+    {
+      "name": "refraction-100",
+      "frames": [
+        0
+      ],
+      "hash": "BDDA610B1C963CC4DCBCFDB7DE327CCEFCC89A49E2EF3C68D28E42F67D19DB41"
+    },
+    {
+      "name": "specular-0",
+      "frames": [
+        0
+      ],
+      "hash": "D63F025CFAB9F511DD343EF857B4E4A882F35BF7BC30DBFFCEF70FAA64982870"
+    },
+    {
+      "name": "specular-100",
+      "frames": [
+        0
+      ],
+      "hash": "0C8512F652702C2D62BF91EC352A24DAE7545156C7C343C4294D8572271EC177"
+    },
+    {
+      "name": "seed-42",
+      "frames": [
+        0
+      ],
+      "hash": "C490055DA37F8A539EE6035EAF93B092B9D3A08593C44954E1D2EBCB13819107"
+    },
+    {
+      "name": "ice-color",
+      "frames": [
+        0
+      ],
+      "hash": "A369732D04849CDA78173E2D4FB39F6AAC35FC1CD62E0944B8B1C3DE79A82B78"
+    }
+  ]
+}

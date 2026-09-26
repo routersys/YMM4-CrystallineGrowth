@@ -16,6 +16,7 @@ public sealed class CrystallineGrowthEffect : VideoEffectBase
 
     public CrystallineGrowthEffect()
     {
+        CrystallineGrowthTelemetry.EnsureStartedOnce();
         CrystallineGrowthUpdateNotifier.EnsureCheckedOnce();
     }
 

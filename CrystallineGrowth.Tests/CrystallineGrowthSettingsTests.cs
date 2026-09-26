@@ -32,6 +32,20 @@ public sealed class CrystallineGrowthSettingsTests
     }
 
     [Theory]
+    [InlineData(1920, 1080, 288, 1920f / 288)]
+    [InlineData(1080, 1920, 288, 1920f / 288)]
+    [InlineData(8, 8, 288, 1f)]
+    [InlineData(4096, 16, 192, 4096f / 192)]
+    [InlineData(100, 100, 384, 1f)]
+    [InlineData(2, 2, 288, 0.5f)]
+    public void TheLongSideIsSplitIntoTheResolutionButNeverIntoFewerThanTheMinimumCells(int width, int height, int resolution, float cellSize)
+    {
+        var (_, _, actual) = CrystallineGrowthSettings.GetGridSize(width, height, resolution);
+
+        Assert.Equal(cellSize, actual, 4);
+    }
+
+    [Theory]
     [InlineData(0f, 1200, 192)]
     [InlineData(10f, 1200, 368)]
     [InlineData(60f, 2048, 1568)]

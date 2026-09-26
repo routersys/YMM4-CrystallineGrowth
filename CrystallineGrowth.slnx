@@ -5,8 +5,13 @@
   </Configurations>
   <Project Path="CrystallineGrowth/CrystallineGrowth.csproj">
     <Platform Solution="*|x64" Project="x64" />
+    <BuildDependency Project="CrystallineGrowth.Shader/CrystallineGrowth.Shader.vcxproj" />
   </Project>
   <Project Path="CrystallineGrowth.Tests/CrystallineGrowth.Tests.csproj" />
   <Project Path="CrystallineGrowth.Harness/CrystallineGrowth.Harness.csproj" />
+  <Project Path="CrystallineGrowth.Shader/CrystallineGrowth.Shader.vcxproj">
+    <BuildType Solution="*|*" Project="Release" />
+    <Platform Solution="*|*" Project="Win32" />
+  </Project>
   <Project Path="YukkuriMovieMaker.Generator/YukkuriMovieMaker.Generator/YukkuriMovieMaker.Generator.csproj" />
 </Solution>

@@ -8,6 +8,8 @@
     "mutate": [
       "**/*.cs",
       "!**/YMM4-GitHubUpdateNotifier/**",
+      "!**/YMM4-Telemetry/**",
+      "!**/CrystallineGrowthTelemetry.cs",
       "!**/CrystallineGrowthUpdateNotifier.cs"
     ],
     "reporters": [

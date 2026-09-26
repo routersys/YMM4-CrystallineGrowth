@@ -244,6 +244,30 @@ public sealed class CrystallineGrowthEffectProcessorTests
         Assert.True(HasFrostOutside(end, source));
     }
 
+    [Theory]
+    [InlineData(100d, 30d)]
+    [InlineData(30d, 100d)]
+    public void AProcessorThatDrewAnotherFreezeDrawsLikeAFreshOne(double firstFreeze, double secondFreeze)
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var source = new SourceImage(context, Size, Size, CenteredSquare);
+        var effect = new CrystallineGrowthEffect();
+        effect.Freeze.Values[0].Value = firstFreeze;
+        using var processor = effect.CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+        RenderFrame(context, processor, 0);
+        effect.Freeze.Values[0].Value = secondFreeze;
+        using var fresh = effect.CreateVideoEffect(context);
+        fresh.SetInput(source.Bitmap);
+        var expected = RenderFrame(context, fresh, 0);
+
+        var reused = RenderFrame(context, processor, 0);
+
+        Assert.True(reused.SamePixelsAs(expected));
+    }
+
     public static readonly TheoryData<string, Action<CrystallineGrowthEffect>> LaterChanges = new()
     {
         { nameof(CrystallineGrowthEffect.Amount), effect => effect.Amount.Values[0].Value = 50d },

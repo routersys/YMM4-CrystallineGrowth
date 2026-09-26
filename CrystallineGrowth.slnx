@@ -4,6 +4,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
     <File Path=".gitmodules" />
@@ -17,9 +18,9 @@
   </Project>
   <Project Path="CrystallineGrowth.Tests/CrystallineGrowth.Tests.csproj" />
   <Project Path="CrystallineGrowth.Harness/CrystallineGrowth.Harness.csproj" />
-  <Project Path="CrystallineGrowth.Shader/CrystallineGrowth.Shader.vcxproj">
-    <BuildType Solution="*|*" Project="Release" />
-    <Platform Solution="*|*" Project="Win32" />
+  <Project Path="CrystallineGrowth.Shader/CrystallineGrowth.Shader.vcxproj" Id="14bdae0a-c2b1-473e-a90c-2ac115506780">
+    <BuildType Project="Release" />
+    <Platform Project="Win32" />
   </Project>
   <Project Path="YukkuriMovieMaker.Generator/YukkuriMovieMaker.Generator/YukkuriMovieMaker.Generator.csproj" />
 </Solution>

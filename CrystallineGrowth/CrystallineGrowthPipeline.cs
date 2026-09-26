@@ -6,21 +6,14 @@ namespace CrystallineGrowth;
 internal sealed class CrystallineGrowthPipeline : IDisposable
 {
     private readonly GraphicsDevice _device;
+    private readonly CrystallineGrowthPipelineHost _host;
     private readonly ReadWriteBuffer<int> _scratch;
     private readonly ReadBackBuffer<int> _scratchReadBack;
     private readonly int[] _boundsMinX;
     private readonly int[] _boundsMinY;
     private readonly int[] _boundsMaxX;
     private readonly int[] _boundsMaxY;
-    private ReadWriteBuffer<int>? _mask;
     private ReadWriteBuffer<int>? _birth;
-    private ReadWriteBuffer<int>? _reachMask;
-    private ReadWriteBuffer<int>? _jumpFloodA;
-    private ReadWriteBuffer<int>? _jumpFloodB;
-    private ReadWriteBuffer<float>? _boundaryMass;
-    private ReadWriteBuffer<float>? _crystalMass;
-    private ReadWriteBuffer<float>? _diffusiveA;
-    private ReadWriteBuffer<float>? _diffusiveB;
     private ReadBackBuffer<int>? _birthReadBack;
     private int[]? _cachedBirth;
     private int _cachedMaxBirth;
@@ -33,9 +26,10 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     private int _packedWidth;
     private int _packedHeight;
 
-    private CrystallineGrowthPipeline(GraphicsDevice device)
+    private CrystallineGrowthPipeline(GraphicsDevice device, CrystallineGrowthPipelineHost host)
     {
         _device = device;
+        _host = host;
         _scratch = device.AllocateReadWriteBuffer<int>(CrystallineGrowthSettings.ScratchLength);
         _scratchReadBack = device.AllocateReadBackBuffer<int>(CrystallineGrowthSettings.ScratchLength);
         _boundsMinX = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
@@ -48,7 +42,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     {
         try
         {
-            return new CrystallineGrowthPipeline(GraphicsDevice.GetDefault());
+            return TryCreate(GraphicsDevice.GetDefault());
         }
         catch
         {
@@ -58,12 +52,16 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
 
     public static CrystallineGrowthPipeline? TryCreate(GraphicsDevice device)
     {
+        CrystallineGrowthPipelineHost? host = null;
         try
         {
-            return new CrystallineGrowthPipeline(device);
+            host = CrystallineGrowthPipelineHost.Create(device, CrystallineGrowthSettings.MaximumPendingSubmissions);
+            return new CrystallineGrowthPipeline(device, host);
         }
         catch
         {
+            host?.Dispose();
+            host?.WaitForDisposal();
             return null;
         }
     }
@@ -81,8 +79,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         var sourceTexture = _packedSource!;
         var outputTexture = _packedOutput!;
         sourceTexture.CopyFrom(MemoryMarshal.Cast<int, Bgra32>(source[..pixelCount]));
-        using (ComputeContext context = _device.CreateComputeContext())
-            RecordFullPipeline(in context, sourceTexture, outputTexture, width, height, in parameters);
+        SubmitFullPipeline(sourceTexture, outputTexture, width, height, in parameters).Wait();
         outputTexture.CopyTo(MemoryMarshal.Cast<int, Bgra32>(destination[..pixelCount]));
     }
 
@@ -94,9 +91,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         EnsureGridFor(width, height, parameters.Quality);
-        using ComputeContext context = _device.CreateComputeContext();
-        RecordFullPipeline(in context, source, destination, width, height, in parameters);
-        context.Submit();
+        _ = SubmitFullPipeline(source, destination, width, height, in parameters);
     }
 
     internal void ProcessSharedAndWait(
@@ -107,8 +102,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         EnsureGridFor(width, height, parameters.Quality);
-        using ComputeContext context = _device.CreateComputeContext();
-        RecordFullPipeline(in context, source, destination, width, height, in parameters);
+        SubmitFullPipeline(source, destination, width, height, in parameters).Wait();
     }
 
     internal bool Simulate(
@@ -123,11 +117,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     {
         EnsureGridFor(canvasWidth, canvasHeight, parameters.Quality);
         var derived = Derive(canvasWidth, canvasHeight, in parameters);
-        using (ComputeContext context = _device.CreateComputeContext())
-        {
-            RecordSilhouetteStage(in context, source, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, in derived);
-            RecordMaskHashStage(in context);
-        }
+        _host.RecordSilhouetteAndMaskHash(
+            source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived).Wait();
         _scratchReadBack.CopyFrom(_scratch);
         var hashed = _scratchReadBack.Span;
         var key = new StructureKey(
@@ -144,8 +135,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         if (_structureKey == key)
             return false;
 
-        using (ComputeContext context = _device.CreateComputeContext())
-            RecordGrowthStage(in context, in derived, in parameters);
+        _host.RecordGrowth(_scratch, _birth!, _gridWidth, _gridHeight, in derived, in parameters).Wait();
         _scratchReadBack.CopyFrom(_scratch);
         var birthReadBack = _birthReadBack!;
         birthReadBack.CopyFrom(_birth!);
@@ -201,12 +191,11 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         var derived = Derive(canvasWidth, canvasHeight, in parameters);
-        using ComputeContext context = _device.CreateComputeContext();
-        RecordRenderStage(in context, source, output, rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, in derived, in parameters);
+        _host.RecordRender(
+            source, output, _scratch, _birth!, in rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived, in parameters).Wait();
     }
 
-    private void RecordFullPipeline(
-        in ComputeContext context,
+    private ComputeSubmission SubmitFullPipeline(
         ReadWriteTexture2D<Bgra32, Float4> source,
         ReadWriteTexture2D<Bgra32, Float4> output,
         int width,
@@ -215,112 +204,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     {
         _structureKey = null;
         var derived = Derive(width, height, in parameters);
-        RecordSilhouetteStage(in context, source, 0, 0, width, height, in derived);
-        RecordGrowthStage(in context, in derived, in parameters);
-        RecordRenderStage(in context, source, output, new PixelRect(0, 0, width, height), 0, 0, width, height, in derived, in parameters);
-    }
-
-    private void RecordSilhouetteStage(
-        in ComputeContext context,
-        ReadWriteTexture2D<Bgra32, Float4> source,
-        int sourceOffsetX,
-        int sourceOffsetY,
-        int sourceWidth,
-        int sourceHeight,
-        in DerivedValues derived)
-    {
-        context.For(_gridWidth, _gridHeight, new SilhouetteShader(
-            source, _mask!, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, derived.CellSize, 0.05f));
-        context.Barrier(_mask!);
-    }
-
-    private void RecordMaskHashStage(in ComputeContext context)
-    {
-        context.For(1, new MaskHashResetShader(_scratch));
-        context.Barrier(_scratch);
-        context.For(_gridWidth, _gridHeight, new MaskHashShader(_mask!, _scratch, _gridWidth, _gridHeight));
-        context.Barrier(_scratch);
-    }
-
-    private void RecordGrowthStage(
-        in ComputeContext context,
-        in DerivedValues derived,
-        in Parameters parameters)
-    {
-        var gridWidth = _gridWidth;
-        var gridHeight = _gridHeight;
-        var mask = _mask!;
-        var birth = _birth!;
-        var boundaryMass = _boundaryMass!;
-        var crystalMass = _crystalMass!;
-        var reachMask = _reachMask!;
-
-        context.For(1, new InitScratchShader(_scratch));
-        context.Barrier(_scratch);
-        context.For(gridWidth, gridHeight, new SeedInitShader(
-            mask, birth, boundaryMass, crystalMass, _diffusiveA!, _scratch, gridWidth, gridHeight, derived.VaporDensity));
-        context.Barrier(birth);
-        context.Barrier(boundaryMass);
-        context.Barrier(crystalMass);
-        context.Barrier(_diffusiveA!);
-        context.Barrier(_scratch);
-
-        context.For(gridWidth, gridHeight, new JumpFloodSeedShader(birth, _jumpFloodA!, gridWidth, gridHeight));
-        context.Barrier(_jumpFloodA!);
-        var reading = _jumpFloodA!;
-        var writing = _jumpFloodB!;
-        var stepSize = 1;
-        var maxSide = Math.Max(gridWidth, gridHeight);
-        while (stepSize < maxSide)
-            stepSize <<= 1;
-        stepSize >>= 1;
-        while (stepSize >= 1)
-        {
-            context.For(gridWidth, gridHeight, new JumpFloodPassShader(reading, writing, gridWidth, gridHeight, stepSize, derived.CellSize));
-            context.Barrier(writing);
-            (reading, writing) = (writing, reading);
-            stepSize >>= 1;
-        }
-        context.For(gridWidth, gridHeight, new ReachMaskShader(reading, reachMask, gridWidth, gridHeight, derived.CellSize, derived.ReachPixels));
-        context.Barrier(reachMask);
-
-        for (var step = 0; step < derived.Steps; step++)
-        {
-            context.For(gridWidth, gridHeight, new DiffusionShader(_diffusiveA!, _diffusiveB!, gridWidth, gridHeight));
-            context.Barrier(_diffusiveB!);
-            context.For(gridWidth, gridHeight, new GrowthUpdateShader(
-                _diffusiveB!, _diffusiveA!, boundaryMass, crystalMass, birth, reachMask, _scratch,
-                gridWidth, gridHeight, step, parameters.Seed,
-                CrystallineGrowthSettings.Kappa, derived.Beta, CrystallineGrowthSettings.Alpha, CrystallineGrowthSettings.Theta,
-                CrystallineGrowthSettings.Mu, CrystallineGrowthSettings.Gamma, derived.Sigma));
-            context.Barrier(_diffusiveA!);
-            context.Barrier(boundaryMass);
-            context.Barrier(crystalMass);
-        }
-        context.Barrier(birth);
-        context.Barrier(_scratch);
-    }
-
-    private void RecordRenderStage(
-        in ComputeContext context,
-        ReadWriteTexture2D<Bgra32, Float4> source,
-        ReadWriteTexture2D<Bgra32, Float4> output,
-        PixelRect rect,
-        int sourceOffsetX,
-        int sourceOffsetY,
-        int sourceWidth,
-        int sourceHeight,
-        in DerivedValues derived,
-        in Parameters parameters)
-    {
-        context.For(rect.Width, rect.Height, new RenderShader(
-            _birth!, _crystalMass!, _scratch, source, output,
-            rect.X, rect.Y, rect.Width, rect.Height, _gridWidth, _gridHeight,
-            sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,
-            derived.CellSize, Math.Clamp(parameters.Freeze, 0f, 1f),
-            Math.Clamp(parameters.Frost, 0f, 1f), derived.RefractionPixels,
-            Math.Clamp(parameters.Specular, 0f, 1f),
-            parameters.ColorR, parameters.ColorG, parameters.ColorB));
+        return _host.RecordFullPipeline(source, output, _scratch, _birth!, width, height, _gridWidth, _gridHeight, in derived, in parameters);
     }
 
     private void BuildBoundsPrefix()
@@ -396,15 +280,19 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
 
         DisposeGridBuffers();
         var gridLength = gridWidth * gridHeight;
-        _mask = _device.AllocateReadWriteBuffer<int>(gridLength);
+        if (!_host.TryEnsureGrid(
+                new CrystallineGrowthGridResources.Plan(
+                    boundaryMassLength: gridLength,
+                    crystalMassLength: gridLength,
+                    diffusiveALength: gridLength,
+                    diffusiveBLength: gridLength,
+                    jumpFloodALength: gridLength,
+                    jumpFloodBLength: gridLength,
+                    maskLength: gridLength,
+                    reachMaskLength: gridLength),
+                out _))
+            throw new InvalidOperationException();
         _birth = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _reachMask = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _jumpFloodA = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _jumpFloodB = _device.AllocateReadWriteBuffer<int>(gridLength);
-        _boundaryMass = _device.AllocateReadWriteBuffer<float>(gridLength);
-        _crystalMass = _device.AllocateReadWriteBuffer<float>(gridLength);
-        _diffusiveA = _device.AllocateReadWriteBuffer<float>(gridLength);
-        _diffusiveB = _device.AllocateReadWriteBuffer<float>(gridLength);
         _birthReadBack = _device.AllocateReadBackBuffer<int>(gridLength);
         _cachedBirth = new int[gridLength];
         _cachedMaxBirth = -1;
@@ -428,25 +316,9 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
 
     private void DisposeGridBuffers()
     {
-        _mask?.Dispose();
         _birth?.Dispose();
-        _reachMask?.Dispose();
-        _jumpFloodA?.Dispose();
-        _jumpFloodB?.Dispose();
-        _boundaryMass?.Dispose();
-        _crystalMass?.Dispose();
-        _diffusiveA?.Dispose();
-        _diffusiveB?.Dispose();
         _birthReadBack?.Dispose();
-        _mask = null;
         _birth = null;
-        _reachMask = null;
-        _jumpFloodA = null;
-        _jumpFloodB = null;
-        _boundaryMass = null;
-        _crystalMass = null;
-        _diffusiveA = null;
-        _diffusiveB = null;
         _birthReadBack = null;
         _cachedBirth = null;
         _cachedMaxBirth = -1;
@@ -458,6 +330,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
 
     public void Dispose()
     {
+        _host.Dispose();
+        _host.WaitForDisposal();
         DisposeGridBuffers();
         _packedSource?.Dispose();
         _packedOutput?.Dispose();
@@ -483,7 +357,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         float Facet,
         float Noise);
 
-    private readonly record struct DerivedValues(
+    internal readonly record struct DerivedValues(
         float CellSize,
         int Steps,
         float VaporDensity,

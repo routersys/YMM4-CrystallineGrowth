@@ -42,6 +42,7 @@ public sealed class CrystallineGrowthEffectProcessorTests
 
     static bool HasFrostOutside(Rendering rendering, SourceImage source)
         => rendering.Coordinates().Any(point => (!source.Contains(point.X, point.Y) || source[point.X, point.Y].Alpha == 0) && rendering[point.X, point.Y].Alpha > 0);
+    static bool Tinted(byte channel, byte alpha, byte color) => Math.Abs(channel - color * alpha / 255d) <= 2d;
 
     [Fact]
     public void TheProcessorHandsTheDrawDescriptionBackUnchanged()
@@ -77,6 +78,29 @@ public sealed class CrystallineGrowthEffectProcessorTests
             Assert.InRange(pixel.Blue, 0, pixel.Alpha);
             Assert.InRange(pixel.Green, 0, pixel.Alpha);
             Assert.InRange(pixel.Red, 0, pixel.Alpha);
+        });
+    }
+
+    [Fact]
+    public void TheFrostTakesTheChosenColor()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var source = new SourceImage(context, Size, Size, CenteredSquare);
+        var effect = new CrystallineGrowthEffect { IceColor = Color.FromRgb(32, 96, 160) };
+        effect.Refraction.Values[0].Value = 0d;
+        effect.Specular.Values[0].Value = 0d;
+        using var processor = effect.CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+
+        var rendering = RenderFrame(context, processor, 0);
+
+        Assert.True(HasFrostOutside(rendering, source));
+        Assert.All(rendering.Coordinates().Where(point => !source.Contains(point.X, point.Y) || source[point.X, point.Y].Alpha == 0), point =>
+        {
+            var pixel = rendering[point.X, point.Y];
+            Assert.True(Tinted(pixel.Red, pixel.Alpha, 32) && Tinted(pixel.Green, pixel.Alpha, 96) && Tinted(pixel.Blue, pixel.Alpha, 160), $"({point.X}, {point.Y}) {pixel}");
         });
     }
 

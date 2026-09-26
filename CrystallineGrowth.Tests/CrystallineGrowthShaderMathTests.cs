@@ -1,9 +1,13 @@
+using ComputeWeave;
+
 namespace CrystallineGrowth.Tests;
 
 public sealed class CrystallineGrowthShaderMathTests
 {
     const float CellSize = 3f;
     const int Column = 7;
+
+    static Float4 Texel(int[] bytes) => new(bytes[0] / 255f, bytes[1] / 255f, bytes[2] / 255f, bytes[3] / 255f);
 
     public static readonly TheoryData<int, int> Neighbors = new()
     {
@@ -46,5 +50,33 @@ public sealed class CrystallineGrowthShaderMathTests
         var back = (x + CrystallineGrowthShaderMath.NeighborDx(opposite, y & 1), y + CrystallineGrowthShaderMath.NeighborDy(opposite));
 
         Assert.Equal((Column, row), back);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void ChangingAnyChannelOfATexelChangesItsMix(int channel)
+    {
+        int[] original = [32, 96, 160, 255];
+        var changed = original.ToArray();
+        changed[channel] += channel == 3 ? -1 : 1;
+
+        var before = CrystallineGrowthShaderMath.MixTexel(1234, Texel(original));
+        var after = CrystallineGrowthShaderMath.MixTexel(1234, Texel(changed));
+
+        Assert.NotEqual(before, after);
+    }
+
+    [Fact]
+    public void TheSameTexelMixesDifferentlyAtAnotherPosition()
+    {
+        var texel = Texel([32, 96, 160, 255]);
+
+        var here = CrystallineGrowthShaderMath.MixTexel(1234, texel);
+        var there = CrystallineGrowthShaderMath.MixTexel(1235, texel);
+
+        Assert.NotEqual(here, there);
     }
 }

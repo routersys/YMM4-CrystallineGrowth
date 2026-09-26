@@ -362,6 +362,31 @@ public sealed class CrystallineGrowthPipelineTests
     }
 
     [Fact]
+    public void RecoloringTheSourceChangesItsHashWithoutGrowingTheCrystalsAgain()
+    {
+        using var pipeline = CreatePipeline();
+        var device = GraphicsDevice.GetDefault();
+        using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(128, 128);
+        var gray = Square(128, 128, 48, 48, 32, 32);
+        var red = gray.Select(pixel => pixel == 0 ? 0 : unchecked((int)0xFFFF0000)).ToArray();
+        var parameters = Parameters(seed: 3);
+        Upload(sourceTexture, gray);
+        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
+        var grayHash = pipeline.SourceHash;
+
+        Upload(sourceTexture, red);
+        var grewAgain = pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
+        var redHash = pipeline.SourceHash;
+        Upload(sourceTexture, gray);
+        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
+
+        Assert.False(grewAgain);
+        Assert.NotEqual(grayHash.Sum, redHash.Sum);
+        Assert.NotEqual(grayHash.Mix, redHash.Mix);
+        Assert.Equal(grayHash, pipeline.SourceHash);
+    }
+
+    [Fact]
     public void TheGrowthIsSimulatedAgainOnlyWhenTheShapeOrTheGrowthSettingsChange()
     {
         using var pipeline = CreatePipeline();

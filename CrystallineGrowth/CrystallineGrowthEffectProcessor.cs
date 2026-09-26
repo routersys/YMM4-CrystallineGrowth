@@ -185,7 +185,8 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             pipelineParameters.ColorR,
             pipelineParameters.ColorG,
             pipelineParameters.ColorB,
-            rect);
+            rect,
+            _pipeline.SourceHash);
         if (structureChanged || outputChanged || !_hasOutput || !_hasRenderState || _renderState != renderState)
         {
             _pipeline.RenderVisible(
@@ -436,7 +437,8 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
         float ColorR,
         float ColorG,
         float ColorB,
-        CrystallineGrowthPipeline.PixelRect Rect);
+        CrystallineGrowthPipeline.PixelRect Rect,
+        CrystallineGrowthPipeline.ContentHash Source);
 
     private readonly record struct Parameters(
         float Amount,

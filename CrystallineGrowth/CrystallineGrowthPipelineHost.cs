@@ -61,7 +61,7 @@ internal sealed partial class CrystallineGrowthPipelineHost
     }
 
     [ComputePipeline]
-    private void RecordSilhouetteAndMaskHash(
+    private void RecordSilhouetteAndHashes(
         in ComputeContext context,
         [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteTexture2D<Bgra32, Float4> source,
@@ -78,11 +78,12 @@ internal sealed partial class CrystallineGrowthPipelineHost
 
         RecordSilhouetteStage(in context, grid, source, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived);
         RecordMaskHashStage(in context, grid, scratch, gridWidth, gridHeight);
+        RecordSourceHashStage(in context, source, scratch, sourceWidth, sourceHeight);
     }
 
     [ComputePipeline]
     [ComputeInterop]
-    private void RecordSharedSilhouetteAndMaskHash(
+    private void RecordSharedSilhouetteAndHashes(
         in ComputeContext context,
         [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
         [ComputeResource(ComputeResourceAccess.ReadWrite, Sharing = ComputeResourceSharing.External)] ReadWriteTexture2D<Bgra32, Float4> source,
@@ -99,6 +100,7 @@ internal sealed partial class CrystallineGrowthPipelineHost
 
         RecordSilhouetteStage(in context, grid, source, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived);
         RecordMaskHashStage(in context, grid, scratch, gridWidth, gridHeight);
+        RecordSourceHashStage(in context, source, scratch, sourceWidth, sourceHeight);
     }
 
     [ComputePipeline]
@@ -191,6 +193,19 @@ internal sealed partial class CrystallineGrowthPipelineHost
         context.For(1, new MaskHashResetShader(scratch));
         context.Barrier(scratch);
         context.For(gridWidth, gridHeight, new MaskHashShader(grid.Mask, scratch, gridWidth, gridHeight));
+        context.Barrier(scratch);
+    }
+
+    private static void RecordSourceHashStage(
+        in ComputeContext context,
+        ReadWriteTexture2D<Bgra32, Float4> source,
+        ReadWriteBuffer<int> scratch,
+        int sourceWidth,
+        int sourceHeight)
+    {
+        context.For(1, new SourceHashResetShader(scratch));
+        context.Barrier(scratch);
+        context.For(sourceWidth, sourceHeight, new SourceHashShader(source, scratch, sourceWidth, sourceHeight));
         context.Barrier(scratch);
     }
 

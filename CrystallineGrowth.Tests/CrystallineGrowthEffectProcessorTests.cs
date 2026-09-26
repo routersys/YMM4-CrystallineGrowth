@@ -18,7 +18,13 @@ public sealed class CrystallineGrowthEffectProcessorTests
 
     static readonly Bgra Gray = Bgra.Opaque(192, 192, 192);
 
+    static readonly Bgra Red = Bgra.Opaque(0, 0, 255);
+
+    static readonly Bgra Green = Bgra.Opaque(0, 160, 0);
+
     static Bgra CenteredSquare(int x, int y) => x is >= 16 and < 48 && y is >= 16 and < 48 ? Gray : Bgra.Transparent;
+
+    static Func<int, int, Bgra> Filled(Bgra color) => (x, y) => x is >= 16 and < 48 && y is >= 16 and < 48 ? color : Bgra.Transparent;
 
     static void RequireInterop(IGraphicsDevicesAndContext devices)
     {
@@ -363,6 +369,28 @@ public sealed class CrystallineGrowthEffectProcessorTests
 
         Assert.False(HasFrostOutside(before, empty));
         Assert.True(HasFrostOutside(after, source));
+    }
+
+    [Fact]
+    public void ARecoloredImageIsDrawnLikeAFreshOne()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var red = new SourceImage(context, Size, Size, Filled(Red));
+        using var green = new SourceImage(context, Size, Size, Filled(Green));
+        var effect = new CrystallineGrowthEffect();
+        using var processor = effect.CreateVideoEffect(context);
+        processor.SetInput(red.Bitmap);
+        RenderFrame(context, processor, 0);
+        using var fresh = effect.CreateVideoEffect(context);
+        fresh.SetInput(green.Bitmap);
+        var expected = RenderFrame(context, fresh, 0);
+
+        processor.SetInput(green.Bitmap);
+        var recolored = RenderFrame(context, processor, 0);
+
+        Assert.True(recolored.SamePixelsAs(expected));
     }
 
     [Fact]

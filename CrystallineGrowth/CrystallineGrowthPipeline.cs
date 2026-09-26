@@ -39,6 +39,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _boundsMaxY = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
     }
 
+    internal ContentHash SourceHash { get; private set; }
+
     public static CrystallineGrowthPipeline? TryCreate()
     {
         try
@@ -122,7 +124,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         var derived = BeginSimulate(canvasWidth, canvasHeight, in parameters);
-        _host.RecordSilhouetteAndMaskHash(
+        _host.RecordSilhouetteAndHashes(
             source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived).Wait();
         return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived);
     }
@@ -138,7 +140,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         var derived = BeginSimulate(canvasWidth, canvasHeight, in parameters);
-        _host.RecordSharedSilhouetteAndMaskHash(
+        _host.RecordSharedSilhouetteAndHashes(
             source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived).Wait();
         return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived);
     }
@@ -153,6 +155,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     {
         _scratchReadBack.CopyFrom(_scratch);
         var hashed = _scratchReadBack.Span;
+        SourceHash = new ContentHash(hashed[CrystallineGrowthSettings.ScratchSourceHashSum], hashed[CrystallineGrowthSettings.ScratchSourceHashMix]);
         var key = new StructureKey(
             hashed[CrystallineGrowthSettings.ScratchMaskHashSum],
             hashed[CrystallineGrowthSettings.ScratchMaskHashMix],
@@ -393,6 +396,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     }
 
     internal readonly record struct PixelRect(int X, int Y, int Width, int Height);
+
+    internal readonly record struct ContentHash(int Sum, int Mix);
 
     private readonly record struct StructureKey(
         int MaskHashSum,

@@ -146,6 +146,64 @@ internal readonly partial struct MaskHashShader(
     }
 }
 
+[ThreadGroupSize(DefaultThreadGroupSizes.X)]
+[GeneratedComputeShaderDescriptor]
+internal readonly partial struct SourceHashResetShader(
+    ReadWriteBuffer<int> scratch) : IComputeShader
+{
+    private readonly ReadWriteBuffer<int> scratch = scratch;
+
+    public void Execute()
+    {
+        if (ThreadIds.X != 0)
+            return;
+        scratch[8] = 0;
+        scratch[9] = 0;
+    }
+}
+
+[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[GeneratedComputeShaderDescriptor]
+internal readonly partial struct SourceHashShader(
+    ReadWriteTexture2D<Bgra32, Float4> source,
+    ReadWriteBuffer<int> scratch,
+    int sourceWidth,
+    int sourceHeight) : IComputeShader
+{
+    private readonly ReadWriteTexture2D<Bgra32, Float4> source = source;
+    private readonly ReadWriteBuffer<int> scratch = scratch;
+    private readonly int sourceWidth = sourceWidth;
+    private readonly int sourceHeight = sourceHeight;
+
+    [GroupShared(2)]
+    private static readonly int[] groupScratch = null!;
+
+    public void Execute()
+    {
+        if (GroupIds.Index == 0)
+        {
+            groupScratch[0] = 0;
+            groupScratch[1] = 0;
+        }
+        Hlsl.GroupMemoryBarrierWithGroupSync();
+
+        var x = ThreadIds.X;
+        var y = ThreadIds.Y;
+        if (x < sourceWidth && y < sourceHeight)
+        {
+            var mixed = CrystallineGrowthShaderMath.MixTexel((uint)(y * sourceWidth + x), source[new Int2(x, y)]);
+            Hlsl.InterlockedAdd(ref groupScratch[0], (int)mixed);
+            Hlsl.InterlockedXor(ref groupScratch[1], (int)(mixed * 0xC2B2AE35u));
+        }
+        Hlsl.GroupMemoryBarrierWithGroupSync();
+
+        if (GroupIds.Index != 0)
+            return;
+        Hlsl.InterlockedAdd(ref scratch[8], groupScratch[0]);
+        Hlsl.InterlockedXor(ref scratch[9], groupScratch[1]);
+    }
+}
+
 [ThreadGroupSize(DefaultThreadGroupSizes.XY)]
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct SeedInitShader(
@@ -683,5 +741,20 @@ internal static class CrystallineGrowthShaderMath
         value *= 0x846CA68Bu;
         value ^= value >> 16;
         return value * 2.3283064e-10f;
+    }
+
+    public static uint MixTexel(uint index, Float4 texel)
+    {
+        var packed = (uint)(texel.X * 255f + 0.5f)
+            | ((uint)(texel.Y * 255f + 0.5f) << 8)
+            | ((uint)(texel.Z * 255f + 0.5f) << 16)
+            | ((uint)(texel.W * 255f + 0.5f) << 24);
+        var mixed = index * 0x9E3779B9u ^ packed;
+        mixed ^= mixed >> 16;
+        mixed *= 0x85EBCA6Bu;
+        mixed ^= mixed >> 13;
+        mixed *= 0xC2B2AE35u;
+        mixed ^= mixed >> 16;
+        return mixed;
     }
 }

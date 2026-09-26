@@ -26,11 +26,13 @@ internal static class CrystallineGrowthSettings
     public const int MaximumCanvasSize = 8192;
     public const int MaximumStepCount = 3072;
     public const int MarginPadding = 80;
-    public const int ScratchLength = 8;
+    public const int ScratchLength = 10;
     public const int ScratchAttachedCount = 0;
     public const int ScratchMaxBirth = 1;
     public const int ScratchMaskHashSum = 6;
     public const int ScratchMaskHashMix = 7;
+    public const int ScratchSourceHashSum = 8;
+    public const int ScratchSourceHashMix = 9;
     public const int MaximumPendingSubmissions = 32;
 
     public static QualitySettings GetQuality(CrystallineGrowthQuality quality)

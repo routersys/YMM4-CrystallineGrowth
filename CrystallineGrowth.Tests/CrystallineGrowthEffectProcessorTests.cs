@@ -325,6 +325,32 @@ public sealed class CrystallineGrowthEffectProcessorTests
         Assert.Equal(secondSize > firstSize, after.Width > before.Width);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FrostAppearsOnceATransparentSourceTakesShape(bool frostWasDrawnBefore)
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var empty = SourceImage.Solid(context, Size, Size, Bgra.Transparent);
+        using var source = new SourceImage(context, Size, Size, CenteredSquare);
+        using var processor = new CrystallineGrowthEffect().CreateVideoEffect(context);
+        if (frostWasDrawnBefore)
+        {
+            processor.SetInput(source.Bitmap);
+            RenderFrame(context, processor, 0);
+        }
+        processor.SetInput(empty.Bitmap);
+        var before = RenderFrame(context, processor, 0);
+
+        processor.SetInput(source.Bitmap);
+        var after = RenderFrame(context, processor, 0);
+
+        Assert.False(HasFrostOutside(before, empty));
+        Assert.True(HasFrostOutside(after, source));
+    }
+
     [Fact]
     public void AFailureWhileUpdatingIsNotSwallowed()
     {

@@ -148,8 +148,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _scratchReadBack.CopyFrom(_scratch);
         var hashed = _scratchReadBack.Span;
         var key = new StructureKey(
-            hashed[6],
-            hashed[7],
+            hashed[CrystallineGrowthSettings.ScratchMaskHashSum],
+            hashed[CrystallineGrowthSettings.ScratchMaskHashMix],
             canvasWidth,
             canvasHeight,
             parameters.Quality,
@@ -166,8 +166,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         var birthReadBack = _birthReadBack!;
         birthReadBack.CopyFrom(_birth!);
         var scratch = _scratchReadBack.Span;
-        _cachedAttached = scratch[0];
-        _cachedMaxBirth = scratch[1];
+        _cachedAttached = scratch[CrystallineGrowthSettings.ScratchAttachedCount];
+        _cachedMaxBirth = scratch[CrystallineGrowthSettings.ScratchMaxBirth];
         birthReadBack.Span.CopyTo(_cachedBirth!);
         BuildBoundsPrefix();
         _structureKey = key;

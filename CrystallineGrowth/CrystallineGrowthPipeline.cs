@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using ComputeWeave;
 
@@ -56,13 +57,18 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         try
         {
             host = CrystallineGrowthPipelineHost.Create(device, CrystallineGrowthSettings.MaximumPendingSubmissions);
-            return new CrystallineGrowthPipeline(device, host);
+            var pipeline = new CrystallineGrowthPipeline(device, host);
+            host = null;
+            return pipeline;
         }
-        catch
+        catch (Win32Exception)
+        {
+            return null;
+        }
+        finally
         {
             host?.Dispose();
             host?.WaitForDisposal();
-            return null;
         }
     }
 

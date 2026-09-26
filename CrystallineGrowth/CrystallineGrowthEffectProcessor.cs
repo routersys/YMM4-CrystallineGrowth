@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Numerics;
 using ComputeWeave;
 using Vortice.Direct2D1;
@@ -306,6 +307,11 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             _interopDomain = interopDevice.RegisterExternalDomain(interopProvider);
             _resourceSet = CrystallineGrowthResourceSet.Create(interopDevice, _interopDomain);
             _pipeline = CrystallineGrowthPipeline.TryCreate(interopDevice);
+        }
+        catch (Win32Exception)
+        {
+            ReleaseInterop();
+            return null;
         }
         catch
         {

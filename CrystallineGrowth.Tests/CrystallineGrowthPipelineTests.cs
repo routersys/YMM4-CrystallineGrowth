@@ -8,11 +8,14 @@ public sealed class CrystallineGrowthPipelineTests
 {
     const int Opaque = unchecked((int)0xFFC0C0C0);
 
+    static readonly bool Direct3D12IsAvailable = GraphicsDevice.EnumerateDevices().Any();
+
     static CrystallineGrowthPipeline CreatePipeline()
     {
-        var pipeline = CrystallineGrowthPipeline.TryCreate();
-        if (pipeline is null)
+        if (!Direct3D12IsAvailable)
             Assert.Skip("Direct3D 12 is unavailable.");
+        var pipeline = CrystallineGrowthPipeline.TryCreate();
+        Assert.NotNull(pipeline);
         return pipeline;
     }
 

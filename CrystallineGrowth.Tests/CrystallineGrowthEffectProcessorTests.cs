@@ -190,6 +190,20 @@ public sealed class CrystallineGrowthEffectProcessorTests
     }
 
     [Fact]
+    public void AnImageThatLeavesNoRoomForTheFrostPassesThroughUntouched()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        using var source = SourceImage.Solid(context, CrystallineGrowthSettings.MaximumCanvasSize - 16, 8, Gray);
+        using var processor = new CrystallineGrowthEffect().CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+
+        var rendering = RenderFrame(context, processor, 0);
+
+        AssertSameAsSource(rendering, source);
+    }
+
+    [Fact]
     public void ReturningToAFrameReproducesItExactly()
     {
         using var devices = new GraphicsDevices();

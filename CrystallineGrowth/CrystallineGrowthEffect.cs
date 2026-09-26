@@ -86,7 +86,17 @@ public sealed class CrystallineGrowthEffect : VideoEffectBase
     public override IEnumerable<string> CreateExoVideoFilters(int keyFrameIndex, ExoOutputDescription exoOutputDescription) => [];
 
     public override IVideoEffectProcessor CreateVideoEffect(IGraphicsDevicesAndContext devices)
-        => new CrystallineGrowthEffectProcessor(devices, this);
+    {
+        try
+        {
+            return new CrystallineGrowthEffectProcessor(devices, this);
+        }
+        catch (Exception exception)
+        {
+            CrystallineGrowthTelemetry.Report(exception);
+            throw;
+        }
+    }
 
     protected override IEnumerable<IAnimatable> GetAnimatables()
         => _animatables ??= [Amount, Freeze, Branching, Facet, Reach, Noise, Frost, Refraction, Specular];

@@ -4,6 +4,9 @@
 YukkuriMovieMaker4上で動作する、素材の輪郭を核形成点とみなし、
 Gravner–Griffeathの雪結晶成長モデルで氷晶を成長させて霜として描画する
 映像エフェクトプラグインです。
+氷晶の成長の計算に使うセルオートマトンは、Gravner and Griffeathの論文「Modeling
+snow crystal growth II: A mesoscopic lattice map with plausible dynamics」
+（Physica D、2008年）に基づきます。
 履歴フレーム、参照画像、深度情報、学習済みモデルは使用しません。
 氷晶の形はシードから決定論的に決まり、同じ設定では常に同じ形になります。
 強さ、凍結度、樹枝化、ファセット、到達距離、ゆらぎ、白濁、屈折、光沢の

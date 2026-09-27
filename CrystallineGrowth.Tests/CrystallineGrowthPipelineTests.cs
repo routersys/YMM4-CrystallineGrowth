@@ -407,4 +407,32 @@ public sealed class CrystallineGrowthPipelineTests
         Upload(sourceTexture, Square(128, 128, 32, 32, 32, 32));
         Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged));
     }
+
+    [Fact]
+    public void WithoutNoiseTheSeedDoesNotGrowTheCrystalsAgain()
+    {
+        using var pipeline = CreatePipeline();
+        var device = GraphicsDevice.GetDefault();
+        using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(128, 128);
+        Upload(sourceTexture, Square(128, 128, 48, 48, 32, 32));
+        var parameters = Parameters(noise: 0f, seed: 3);
+        var seedChanged = parameters with { Seed = 4 };
+        var noiseAdded = seedChanged with { Noise = 0.25f };
+
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters));
+        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in noiseAdded));
+    }
+
+    [Fact]
+    public void WithoutNoiseEverySeedDrawsTheSameFrost()
+    {
+        using var pipeline = CreatePipeline();
+        var source = Square(128, 128, 48, 48, 32, 32);
+
+        var first = Render(pipeline, source, 128, 128, Parameters(noise: 0f, seed: 1));
+        var second = Render(pipeline, source, 128, 128, Parameters(noise: 0f, seed: 2));
+
+        Assert.Equal(first, second);
+    }
 }

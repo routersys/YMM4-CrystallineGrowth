@@ -162,7 +162,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
             canvasWidth,
             canvasHeight,
             parameters.Quality,
-            parameters.Seed,
+            derived.Sigma > 0f ? parameters.Seed : 0,
             parameters.ReachPixels,
             parameters.Branching,
             parameters.Facet,

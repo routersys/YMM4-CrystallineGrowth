@@ -49,19 +49,24 @@ internal sealed partial class CrystallineGrowthPipelineHost
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteTexture2D<Bgra32, Float4> output,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> birth,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileBase,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileMask,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<float> geometry,
         int width,
         int height,
         int gridWidth,
         int gridHeight,
         in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int mode,
+        int geometryCapacity)
     {
         _ = _device;
 
         RecordSilhouetteStage(in context, grid, source, 0, 0, width, height, gridWidth, gridHeight, in derived);
         RecordGrowthSetupStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived);
         RecordGrowthStepsStage(in context, grid, scratch, birth, gridWidth, gridHeight, in derived, in parameters, 0, derived.Steps);
-        RecordRenderStage(in context, grid, source, output, scratch, birth, new CrystallineGrowthPipeline.PixelRect(0, 0, width, height), 0, 0, width, height, gridWidth, gridHeight, in derived, in parameters);
+        RecordRenderStage(in context, grid, source, output, scratch, birth, tileBase, tileMask, geometry, new CrystallineGrowthPipeline.PixelRect(0, 0, width, height), 0, 0, width, height, gridWidth, gridHeight, in derived, in parameters, mode, geometryCapacity);
     }
 
     [ComputePipeline]
@@ -157,6 +162,9 @@ internal sealed partial class CrystallineGrowthPipelineHost
         [ComputeResource(ComputeResourceAccess.ReadWrite, Sharing = ComputeResourceSharing.External)] ReadWriteTexture2D<Bgra32, Float4> output,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> birth,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileBase,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileMask,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<float> geometry,
         in CrystallineGrowthPipeline.PixelRect rect,
         int sourceOffsetX,
         int sourceOffsetY,
@@ -165,11 +173,13 @@ internal sealed partial class CrystallineGrowthPipelineHost
         int gridWidth,
         int gridHeight,
         in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int mode,
+        int geometryCapacity)
     {
         _ = _device;
 
-        RecordRenderStage(in context, grid, source, output, scratch, birth, rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived, in parameters);
+        RecordRenderStage(in context, grid, source, output, scratch, birth, tileBase, tileMask, geometry, rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived, in parameters, mode, geometryCapacity);
     }
 
     [ComputePipeline]
@@ -213,6 +223,9 @@ internal sealed partial class CrystallineGrowthPipelineHost
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteTexture2D<Bgra32, Float4> output,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
         [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> birth,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileBase,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> tileMask,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<float> geometry,
         in CrystallineGrowthPipeline.PixelRect rect,
         int sourceOffsetX,
         int sourceOffsetY,
@@ -221,11 +234,13 @@ internal sealed partial class CrystallineGrowthPipelineHost
         int gridWidth,
         int gridHeight,
         in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int mode,
+        int geometryCapacity)
     {
         _ = _device;
 
-        RecordRenderStage(in context, grid, source, output, scratch, birth, rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived, in parameters);
+        RecordRenderStage(in context, grid, source, output, scratch, birth, tileBase, tileMask, geometry, rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived, in parameters, mode, geometryCapacity);
     }
 
     private static void RecordSilhouetteStage(
@@ -346,6 +361,9 @@ internal sealed partial class CrystallineGrowthPipelineHost
         ReadWriteTexture2D<Bgra32, Float4> output,
         ReadWriteBuffer<int> scratch,
         ReadWriteBuffer<int> birth,
+        ReadWriteBuffer<int> tileBase,
+        ReadWriteBuffer<int> tileMask,
+        ReadWriteBuffer<float> geometry,
         in CrystallineGrowthPipeline.PixelRect rect,
         int sourceOffsetX,
         int sourceOffsetY,
@@ -354,19 +372,30 @@ internal sealed partial class CrystallineGrowthPipelineHost
         int gridWidth,
         int gridHeight,
         in CrystallineGrowthPipeline.DerivedValues derived,
-        in CrystallineGrowthPipeline.Parameters parameters)
+        in CrystallineGrowthPipeline.Parameters parameters,
+        int mode,
+        int geometryCapacity)
     {
-        var gridLength = gridWidth * gridHeight;
-        context.For(gridLength, new RenderMassShader(
-            birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
-        context.Barrier(grid.RenderMass);
+        if (mode != CrystallineGrowthSettings.RenderModeCached)
+        {
+            var gridLength = gridWidth * gridHeight;
+            context.For(gridLength, new RenderMassShader(
+                birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
+            context.Barrier(grid.RenderMass);
+        }
+        if (mode == CrystallineGrowthSettings.RenderModeCount || mode == CrystallineGrowthSettings.RenderModeStore)
+        {
+            context.For(1, new ShadedCountResetShader(scratch));
+            context.Barrier(scratch);
+        }
         context.For(CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width), CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height), new RenderShader(
-            grid.RenderMass, source, output,
+            grid.RenderMass, scratch, tileBase, tileMask, geometry, source, output,
             rect.X, rect.Y, rect.Width, rect.Height, gridWidth, gridHeight,
             sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,
             derived.CellSize,
             Math.Clamp(parameters.Frost, 0f, 1f), derived.RefractionPixels,
             Math.Clamp(parameters.Specular, 0f, 1f),
-            parameters.ColorR, parameters.ColorG, parameters.ColorB));
+            parameters.ColorR, parameters.ColorG, parameters.ColorB,
+            mode, geometryCapacity));
     }
 }

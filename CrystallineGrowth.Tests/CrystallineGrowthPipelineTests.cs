@@ -290,6 +290,50 @@ public sealed class CrystallineGrowthPipelineTests
         }
     }
 
+    static uint[] DrawVisible(
+        CrystallineGrowthPipeline pipeline,
+        ReadWriteTexture2D<Bgra32, Float4> sourceTexture,
+        CrystallineGrowthPipeline.PixelRect rect,
+        CrystallineGrowthPipeline.Parameters parameters)
+    {
+        using var outputTexture = GraphicsDevice.GetDefault().AllocateReadWriteTexture2D<Bgra32, Float4>(rect.Width, rect.Height);
+        pipeline.RenderVisible(sourceTexture, outputTexture, 128, 128, 0, 0, 128, 128, rect, in parameters);
+        var pixels = new Bgra32[rect.Width * rect.Height];
+        outputTexture.CopyTo(pixels);
+        return pixels.Select(static pixel => pixel.PackedValue).ToArray();
+    }
+
+    [Fact]
+    public void SettingsRedrawnFrameAfterFrameMatchAFreshRender()
+    {
+        using var pipeline = CreatePipeline();
+        using var sourceTexture = GraphicsDevice.GetDefault().AllocateReadWriteTexture2D<Bgra32, Float4>(128, 128);
+        Upload(sourceTexture, Square(128, 128, 48, 48, 32, 32));
+        var first = Parameters(seed: 3);
+        var frames = new[]
+        {
+            first,
+            first with { Frost = 0.9f },
+            first with { Refraction = 1f },
+            first with { Specular = 1f },
+            first with { ColorR = 0.2f },
+            first with { Freeze = 0.6f },
+            first with { Freeze = 0.6f, Frost = 0.2f },
+            first with { Freeze = 0.6f, Refraction = 0f },
+            first with { Freeze = 0.6f, Specular = 0f },
+        };
+
+        foreach (var parameters in frames)
+        {
+            pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: false);
+            Assert.True(pipeline.TryGetVisibleBounds(128, 128, in parameters, out var rect));
+            using var fresh = CreatePipeline();
+            fresh.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: false);
+
+            Assert.Equal(DrawVisible(fresh, sourceTexture, rect, parameters), DrawVisible(pipeline, sourceTexture, rect, parameters));
+        }
+    }
+
     [Fact]
     public void TheVisibleBoundsHugTheFrostOnAFourPixelGrid()
     {

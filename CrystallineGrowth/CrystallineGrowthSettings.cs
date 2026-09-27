@@ -29,6 +29,7 @@ internal static class CrystallineGrowthSettings
     public const int ScratchLength = 10;
     public const int ScratchAttachedCount = 0;
     public const int ScratchMaxBirth = 1;
+    public const int ScratchShadedCount = 2;
     public const int ScratchMaskHashSum = 6;
     public const int ScratchMaskHashMix = 7;
     public const int ScratchSourceHashSum = 8;
@@ -38,6 +39,10 @@ internal static class CrystallineGrowthSettings
     public const int GrowthGroupWidth = 32;
     public const int GrowthGroupHeight = 2;
     public const int RenderTileSize = 8;
+    public const int RenderModeDraw = 0;
+    public const int RenderModeCount = 1;
+    public const int RenderModeStore = 2;
+    public const int RenderModeCached = 3;
 
     public static QualitySettings GetQuality(CrystallineGrowthQuality quality)
         => quality switch

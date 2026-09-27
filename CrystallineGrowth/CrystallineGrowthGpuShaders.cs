@@ -148,6 +148,19 @@ internal readonly partial struct MaskHashShader(
 
 [ThreadGroupSize(DefaultThreadGroupSizes.X)]
 [GeneratedComputeShaderDescriptor]
+internal readonly partial struct ShadedCountResetShader(
+    ReadWriteBuffer<int> scratch) : IComputeShader
+{
+    private readonly ReadWriteBuffer<int> scratch = scratch;
+
+    public void Execute()
+    {
+        scratch[CrystallineGrowthSettings.ScratchShadedCount] = 0;
+    }
+}
+
+[ThreadGroupSize(DefaultThreadGroupSizes.X)]
+[GeneratedComputeShaderDescriptor]
 internal readonly partial struct SourceHashResetShader(
     ReadWriteBuffer<int> scratch) : IComputeShader
 {
@@ -580,6 +593,10 @@ internal readonly partial struct RenderMassShader(
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct RenderShader(
     ReadWriteBuffer<float> renderMass,
+    ReadWriteBuffer<int> scratch,
+    ReadWriteBuffer<int> tileBase,
+    ReadWriteBuffer<int> tileMask,
+    ReadWriteBuffer<float> geometry,
     ReadWriteTexture2D<Bgra32, Float4> source,
     ReadWriteTexture2D<Bgra32, Float4> output,
     int rectOffsetX,
@@ -598,9 +615,15 @@ internal readonly partial struct RenderShader(
     float specular,
     float colorR,
     float colorG,
-    float colorB) : IComputeShader
+    float colorB,
+    int mode,
+    int geometryCapacity) : IComputeShader
 {
     private readonly ReadWriteBuffer<float> renderMass = renderMass;
+    private readonly ReadWriteBuffer<int> scratch = scratch;
+    private readonly ReadWriteBuffer<int> tileBase = tileBase;
+    private readonly ReadWriteBuffer<int> tileMask = tileMask;
+    private readonly ReadWriteBuffer<float> geometry = geometry;
     private readonly ReadWriteTexture2D<Bgra32, Float4> source = source;
     private readonly ReadWriteTexture2D<Bgra32, Float4> output = output;
     private readonly int rectOffsetX = rectOffsetX;
@@ -620,100 +643,173 @@ internal readonly partial struct RenderShader(
     private readonly float colorR = colorR;
     private readonly float colorG = colorG;
     private readonly float colorB = colorB;
+    private readonly int mode = mode;
+    private readonly int geometryCapacity = geometryCapacity;
 
-    [GroupShared(1)]
-    private static readonly int[] tileLit = null!;
+    [GroupShared(4)]
+    private static readonly int[] tileShared = null!;
 
     public void Execute()
     {
         var kernelRadius = CrystallineGrowthSettings.KernelRadiusFactor * cellSize;
         var inverseRadiusSquared = 1f / (kernelRadius * kernelRadius);
         var rowStep = cellSize * CrystallineGrowthSettings.RowStep;
-        if (GroupIds.Index == 0)
-            tileLit[0] = 0;
-        Hlsl.GroupMemoryBarrierWithGroupSync();
-
-        var tileLeft = ThreadIds.X - GroupIds.X + rectOffsetX + 0.5f;
-        var tileTop = ThreadIds.Y - GroupIds.Y + rectOffsetY + 0.5f;
-        var tileSpan = CrystallineGrowthSettings.RenderTileSize - 1;
-        var tileJ0 = Hlsl.Max((int)Hlsl.Floor((tileTop - kernelRadius) / rowStep - 0.5f) - 1, 0);
-        var tileJ1 = Hlsl.Min((int)Hlsl.Ceil((tileTop + tileSpan + kernelRadius) / rowStep - 0.5f) + 1, gridHeight - 1);
-        var tileI0 = Hlsl.Max((int)Hlsl.Floor((tileLeft - kernelRadius) / cellSize - 1f) - 1, 0);
-        var tileI1 = Hlsl.Min((int)Hlsl.Ceil((tileLeft + tileSpan + kernelRadius) / cellSize - 0.5f) + 1, gridWidth - 1);
-        var tileWidth = Hlsl.Max(tileI1 - tileI0 + 1, 0);
-        var tileCells = tileWidth * Hlsl.Max(tileJ1 - tileJ0 + 1, 0);
-        for (var slot = GroupIds.Index; slot < tileCells; slot += CrystallineGrowthSettings.RenderTileSize * CrystallineGrowthSettings.RenderTileSize)
-        {
-            if (renderMass[(tileJ0 + slot / tileWidth) * gridWidth + tileI0 + slot % tileWidth] > 0f)
-                Hlsl.InterlockedOr(ref tileLit[0], 1);
-        }
-        Hlsl.GroupMemoryBarrierWithGroupSync();
-
-        if (ThreadIds.X >= rectWidth || ThreadIds.Y >= rectHeight)
-            return;
-        if (tileLit[0] == 0)
-        {
-            output[ThreadIds.XY] = new Float4(0f, 0f, 0f, 0f);
-            return;
-        }
+        var tile = ThreadIds.Y / CrystallineGrowthSettings.RenderTileSize * ((rectWidth + CrystallineGrowthSettings.RenderTileSize - 1) / CrystallineGrowthSettings.RenderTileSize)
+            + ThreadIds.X / CrystallineGrowthSettings.RenderTileSize;
+        var bit = GroupIds.Index;
+        var inside = ThreadIds.X < rectWidth && ThreadIds.Y < rectHeight;
         var px = ThreadIds.X + rectOffsetX + 0.5f;
         var py = ThreadIds.Y + rectOffsetY + 0.5f;
-        var j0 = Hlsl.Max((int)Hlsl.Floor((py - kernelRadius) / rowStep - 0.5f), 0);
-        var j1 = Hlsl.Min((int)Hlsl.Ceil((py + kernelRadius) / rowStep - 0.5f), gridHeight - 1);
 
-        var num = 0f;
-        var den = 0f;
-        var numX = 0f;
-        var denX = 0f;
-        var numY = 0f;
-        var denY = 0f;
-        for (var j = j0; j <= j1; j++)
+        var lit = 0;
+        if (mode != CrystallineGrowthSettings.RenderModeCached)
         {
-            var shift = 0.5f * (j & 1) + 0.5f;
-            var i0 = Hlsl.Max((int)Hlsl.Floor((px - kernelRadius) / cellSize - shift), 0);
-            var i1 = Hlsl.Min((int)Hlsl.Ceil((px + kernelRadius) / cellSize - shift), gridWidth - 1);
-            var cy = (j + 0.5f) * rowStep;
-            var dy = py - cy;
-            for (var i = i0; i <= i1; i++)
+            if (GroupIds.Index == 0)
             {
-                var cx = (i + shift) * cellSize;
-                var dx = px - cx;
-                var distanceSquared = dx * dx + dy * dy;
-                var u = distanceSquared * inverseRadiusSquared;
-                if (u >= 1f)
-                    continue;
-                var oneMinusU = 1f - u;
-                var weight = oneMinusU * oneMinusU;
-                var weightGradientScale = -4f * oneMinusU * inverseRadiusSquared;
-                var mass = renderMass[j * gridWidth + i];
-                num += weight * mass;
-                den += weight;
-                numX += weightGradientScale * dx * mass;
-                denX += weightGradientScale * dx;
-                numY += weightGradientScale * dy * mass;
-                denY += weightGradientScale * dy;
+                tileShared[0] = 0;
+                tileShared[1] = 0;
+                tileShared[2] = 0;
+            }
+            Hlsl.GroupMemoryBarrierWithGroupSync();
+
+            var tileLeft = ThreadIds.X - GroupIds.X + rectOffsetX + 0.5f;
+            var tileTop = ThreadIds.Y - GroupIds.Y + rectOffsetY + 0.5f;
+            var tileSpan = CrystallineGrowthSettings.RenderTileSize - 1;
+            var tileJ0 = Hlsl.Max((int)Hlsl.Floor((tileTop - kernelRadius) / rowStep - 0.5f) - 1, 0);
+            var tileJ1 = Hlsl.Min((int)Hlsl.Ceil((tileTop + tileSpan + kernelRadius) / rowStep - 0.5f) + 1, gridHeight - 1);
+            var tileI0 = Hlsl.Max((int)Hlsl.Floor((tileLeft - kernelRadius) / cellSize - 1f) - 1, 0);
+            var tileI1 = Hlsl.Min((int)Hlsl.Ceil((tileLeft + tileSpan + kernelRadius) / cellSize - 0.5f) + 1, gridWidth - 1);
+            var tileWidth = Hlsl.Max(tileI1 - tileI0 + 1, 0);
+            var tileCells = tileWidth * Hlsl.Max(tileJ1 - tileJ0 + 1, 0);
+            for (var slot = GroupIds.Index; slot < tileCells; slot += CrystallineGrowthSettings.RenderTileSize * CrystallineGrowthSettings.RenderTileSize)
+            {
+                if (renderMass[(tileJ0 + slot / tileWidth) * gridWidth + tileI0 + slot % tileWidth] > 0f)
+                    Hlsl.InterlockedOr(ref tileShared[0], 1);
+            }
+            Hlsl.GroupMemoryBarrierWithGroupSync();
+            lit = tileShared[0];
+        }
+
+        var shaded = false;
+        var field = 0f;
+        var slopeX = 0f;
+        var slopeY = 0f;
+        var color = new Float4(0f, 0f, 0f, 0f);
+        if (inside && mode == CrystallineGrowthSettings.RenderModeCached)
+        {
+            var cachedBase = tileBase[tile];
+            if (cachedBase >= 0)
+            {
+                var lowMask = (uint)tileMask[tile * 2];
+                var highMask = (uint)tileMask[tile * 2 + 1];
+                var rank = CrystallineGrowthShaderMath.TileRank(lowMask, highMask, (uint)bit);
+                if (rank >= 0)
+                {
+                    var slotIndex = (cachedBase + rank) * 3;
+                    color = Shade(px, py, geometry[slotIndex], geometry[slotIndex + 1], geometry[slotIndex + 2]);
+                }
+            }
+        }
+        else if (inside && lit != 0)
+        {
+            var j0 = Hlsl.Max((int)Hlsl.Floor((py - kernelRadius) / rowStep - 0.5f), 0);
+            var j1 = Hlsl.Min((int)Hlsl.Ceil((py + kernelRadius) / rowStep - 0.5f), gridHeight - 1);
+
+            var num = 0f;
+            var den = 0f;
+            var numX = 0f;
+            var denX = 0f;
+            var numY = 0f;
+            var denY = 0f;
+            for (var j = j0; j <= j1; j++)
+            {
+                var shift = 0.5f * (j & 1) + 0.5f;
+                var i0 = Hlsl.Max((int)Hlsl.Floor((px - kernelRadius) / cellSize - shift), 0);
+                var i1 = Hlsl.Min((int)Hlsl.Ceil((px + kernelRadius) / cellSize - shift), gridWidth - 1);
+                var cy = (j + 0.5f) * rowStep;
+                var dy = py - cy;
+                for (var i = i0; i <= i1; i++)
+                {
+                    var cx = (i + shift) * cellSize;
+                    var dx = px - cx;
+                    var distanceSquared = dx * dx + dy * dy;
+                    var u = distanceSquared * inverseRadiusSquared;
+                    if (u >= 1f)
+                        continue;
+                    var oneMinusU = 1f - u;
+                    var weight = oneMinusU * oneMinusU;
+                    var weightGradientScale = -4f * oneMinusU * inverseRadiusSquared;
+                    var mass = renderMass[j * gridWidth + i];
+                    num += weight * mass;
+                    den += weight;
+                    numX += weightGradientScale * dx * mass;
+                    denX += weightGradientScale * dx;
+                    numY += weightGradientScale * dy * mass;
+                    denY += weightGradientScale * dy;
+                }
+            }
+
+            if (num > 0f)
+            {
+                var safeDen = Hlsl.Max(den, 1e-4f);
+                field = num / safeDen;
+                var coverage = Hlsl.SmoothStep(CrystallineGrowthSettings.CoverageLow, CrystallineGrowthSettings.CoverageHigh, field);
+                if (coverage > 0f)
+                {
+                    var inverseDenSquared = 1f / (safeDen * safeDen);
+                    var amplitude = CrystallineGrowthSettings.NormalAmplitudeFactor * cellSize;
+                    slopeX = (numX * safeDen - num * denX) * inverseDenSquared * amplitude;
+                    slopeY = (numY * safeDen - num * denY) * inverseDenSquared * amplitude;
+                    shaded = true;
+                    color = Shade(px, py, field, slopeX, slopeY);
+                }
             }
         }
 
-        if (num <= 0f)
-        {
-            output[ThreadIds.XY] = new Float4(0f, 0f, 0f, 0f);
-            return;
-        }
+        if (inside)
+            output[ThreadIds.XY] = color;
 
-        var safeDen = Hlsl.Max(den, 1e-4f);
-        var field = num / safeDen;
+        if (mode == CrystallineGrowthSettings.RenderModeCount || mode == CrystallineGrowthSettings.RenderModeStore)
+        {
+            if (shaded)
+                Hlsl.InterlockedOr(ref tileShared[1 + bit / 32], (int)(1u << (bit % 32)));
+            Hlsl.GroupMemoryBarrierWithGroupSync();
+
+            if (GroupIds.Index == 0)
+            {
+                var lowMask = (uint)tileShared[1];
+                var highMask = (uint)tileShared[2];
+                var count = (int)(Hlsl.CountBits(lowMask) + Hlsl.CountBits(highMask));
+                var stored = -1;
+                if (count > 0)
+                {
+                    Hlsl.InterlockedAdd(ref scratch[CrystallineGrowthSettings.ScratchShadedCount], count, out var first);
+                    if (mode == CrystallineGrowthSettings.RenderModeStore && first + count <= geometryCapacity)
+                        stored = first;
+                }
+                if (mode == CrystallineGrowthSettings.RenderModeStore)
+                {
+                    tileBase[tile] = stored;
+                    tileMask[tile * 2] = (int)lowMask;
+                    tileMask[tile * 2 + 1] = (int)highMask;
+                }
+                tileShared[3] = stored;
+            }
+            Hlsl.GroupMemoryBarrierWithGroupSync();
+
+            if (mode == CrystallineGrowthSettings.RenderModeStore && shaded && tileShared[3] >= 0)
+            {
+                var slotIndex = (tileShared[3] + CrystallineGrowthShaderMath.TileRank((uint)tileShared[1], (uint)tileShared[2], (uint)bit)) * 3;
+                geometry[slotIndex] = field;
+                geometry[slotIndex + 1] = slopeX;
+                geometry[slotIndex + 2] = slopeY;
+            }
+        }
+    }
+
+    private Float4 Shade(float px, float py, float field, float slopeX, float slopeY)
+    {
         var coverage = Hlsl.SmoothStep(CrystallineGrowthSettings.CoverageLow, CrystallineGrowthSettings.CoverageHigh, field);
-        if (coverage <= 0f)
-        {
-            output[ThreadIds.XY] = new Float4(0f, 0f, 0f, 0f);
-            return;
-        }
-
-        var inverseDenSquared = 1f / (safeDen * safeDen);
-        var amplitude = CrystallineGrowthSettings.NormalAmplitudeFactor * cellSize;
-        var slopeX = (numX * safeDen - num * denX) * inverseDenSquared * amplitude;
-        var slopeY = (numY * safeDen - num * denY) * inverseDenSquared * amplitude;
         var normal = Hlsl.Normalize(new Float3(-slopeX, -slopeY, 1f));
 
         var offsetScale = refractionPixels / Hlsl.Max(normal.Z, 0.5f);
@@ -733,7 +829,7 @@ internal readonly partial struct RenderShader(
         var r = Hlsl.Min(coverage * baseR + highlight * alpha, alpha);
         var g = Hlsl.Min(coverage * baseG + highlight * alpha, alpha);
         var b = Hlsl.Min(coverage * baseB + highlight * alpha, alpha);
-        output[ThreadIds.XY] = new Float4(r, g, b, alpha);
+        return new Float4(r, g, b, alpha);
     }
 
     private Float4 SampleSource(float x, float y)
@@ -788,6 +884,14 @@ internal static class CrystallineGrowthShaderMath
         value *= 0x846CA68Bu;
         value ^= value >> 16;
         return value * 2.3283064e-10f;
+    }
+
+    public static int TileRank(uint lowMask, uint highMask, uint bit)
+    {
+        if (bit < 32u)
+            return (lowMask & (1u << (int)bit)) != 0u ? (int)Hlsl.CountBits(lowMask & ((1u << (int)bit) - 1u)) : -1;
+        var highBit = bit - 32u;
+        return (highMask & (1u << (int)highBit)) != 0u ? (int)(Hlsl.CountBits(lowMask) + Hlsl.CountBits(highMask & ((1u << (int)highBit) - 1u))) : -1;
     }
 
     public static uint MixTexel(uint index, Float4 texel)

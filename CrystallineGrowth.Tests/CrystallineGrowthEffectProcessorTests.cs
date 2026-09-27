@@ -420,6 +420,53 @@ public sealed class CrystallineGrowthEffectProcessorTests
     }
 
     [Fact]
+    public void FrostChangedFrameAfterFrameIsDrawnLikeAFreshOne()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var source = new SourceImage(context, Size, Size, CenteredSquare);
+        var effect = new CrystallineGrowthEffect();
+        using var processor = effect.CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+
+        foreach (var frost in new[] { 70d, 80d, 90d, 100d, 40d })
+        {
+            effect.Frost.Values[0].Value = frost;
+            var reused = RenderFrame(context, processor, 0);
+            using var fresh = effect.CreateVideoEffect(context);
+            fresh.SetInput(source.Bitmap);
+            var expected = RenderFrame(context, fresh, 0);
+
+            Assert.True(reused.SamePixelsAs(expected), $"{frost}");
+        }
+    }
+
+    [Fact]
+    public void AnImageRecoloredFrameAfterFrameIsDrawnLikeAFreshOne()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var red = new SourceImage(context, Size, Size, Filled(Red));
+        using var green = new SourceImage(context, Size, Size, Filled(Green));
+        using var gray = new SourceImage(context, Size, Size, Filled(Gray));
+        var effect = new CrystallineGrowthEffect();
+        using var processor = effect.CreateVideoEffect(context);
+
+        foreach (var (name, source) in new[] { ("red", red), ("green", green), ("gray", gray), ("red", red), ("green", green) })
+        {
+            processor.SetInput(source.Bitmap);
+            var reused = RenderFrame(context, processor, 0);
+            using var fresh = effect.CreateVideoEffect(context);
+            fresh.SetInput(source.Bitmap);
+            var expected = RenderFrame(context, fresh, 0);
+
+            Assert.True(reused.SamePixelsAs(expected), name);
+        }
+    }
+
+    [Fact]
     public void AFailureWhileUpdatingIsNotSwallowed()
     {
         using var devices = new GraphicsDevices();

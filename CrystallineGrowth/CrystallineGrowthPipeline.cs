@@ -10,6 +10,9 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     private readonly CrystallineGrowthPipelineHost _host;
     private readonly ReadWriteBuffer<int> _scratch;
     private readonly ReadBackBuffer<int> _scratchReadBack;
+    private readonly ReadWriteBuffer<int> _unusedTileBase;
+    private readonly ReadWriteBuffer<int> _unusedTileMask;
+    private readonly ReadWriteBuffer<float> _unusedGeometry;
     private readonly int[] _boundsMinX;
     private readonly int[] _boundsMinY;
     private readonly int[] _boundsMaxX;
@@ -20,6 +23,14 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     private int _cachedMaxBirth;
     private int _cachedAttached;
     private StructureKey? _structureKey;
+    private int _structureGeneration;
+    private GeometryKey? _geometryKey;
+    private GeometryStage _geometryStage;
+    private int _shadedCount;
+    private int _geometryCapacity;
+    private ReadWriteBuffer<int>? _tileBase;
+    private ReadWriteBuffer<int>? _tileMask;
+    private ReadWriteBuffer<float>? _geometry;
     private int _gridWidth;
     private int _gridHeight;
     private ReadWriteTexture2D<Bgra32, Float4>? _packedSource;
@@ -33,6 +44,9 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _host = host;
         _scratch = device.AllocateReadWriteBuffer<int>(CrystallineGrowthSettings.ScratchLength);
         _scratchReadBack = device.AllocateReadBackBuffer<int>(CrystallineGrowthSettings.ScratchLength);
+        _unusedTileBase = device.AllocateReadWriteBuffer<int>(1);
+        _unusedTileMask = device.AllocateReadWriteBuffer<int>(1);
+        _unusedGeometry = device.AllocateReadWriteBuffer<float>(1);
         _boundsMinX = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
         _boundsMinY = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
         _boundsMaxX = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
@@ -165,6 +179,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
     {
         _scratchReadBack.CopyFrom(_scratch);
         var hashed = _scratchReadBack.Span;
+        ResolveGeometry(hashed[CrystallineGrowthSettings.ScratchShadedCount]);
         SourceHash = hashSource
             ? new ContentHash(hashed[CrystallineGrowthSettings.ScratchSourceHashSum], hashed[CrystallineGrowthSettings.ScratchSourceHashMix])
             : null;
@@ -199,6 +214,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         birthReadBack.Span.CopyTo(_cachedBirth!);
         BuildBoundsPrefix();
         _structureKey = key;
+        _structureGeneration++;
         return true;
     }
 
@@ -245,8 +261,10 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         var derived = Derive(canvasWidth, canvasHeight, in parameters);
+        var mode = PrepareGeometry(in rect, Math.Clamp(parameters.Freeze, 0f, 1f));
         _host.RecordRender(
-            source, output, _scratch, _birth!, in rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived, in parameters).Wait();
+            source, output, _scratch, _birth!, _tileBase ?? _unusedTileBase, _tileMask ?? _unusedTileMask, _geometry ?? _unusedGeometry,
+            in rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived, in parameters, mode, _geometryCapacity).Wait();
     }
 
     internal void RenderVisible(
@@ -262,8 +280,10 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         var derived = Derive(canvasWidth, canvasHeight, in parameters);
+        var mode = PrepareGeometry(in rect, Math.Clamp(parameters.Freeze, 0f, 1f));
         _host.RecordSharedRender(
-            source, output, _scratch, _birth!, in rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived, in parameters).Wait();
+            source, output, _scratch, _birth!, _tileBase ?? _unusedTileBase, _tileMask ?? _unusedTileMask, _geometry ?? _unusedGeometry,
+            in rect, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived, in parameters, mode, _geometryCapacity).Wait();
     }
 
     private ComputeSubmission SubmitFullPipeline(
@@ -274,8 +294,82 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         in Parameters parameters)
     {
         _structureKey = null;
+        _structureGeneration++;
+        ReleaseGeometry();
         var derived = Derive(width, height, in parameters);
-        return _host.RecordFullPipeline(source, output, _scratch, _birth!, width, height, _gridWidth, _gridHeight, in derived, in parameters);
+        return _host.RecordFullPipeline(
+            source, output, _scratch, _birth!, _unusedTileBase, _unusedTileMask, _unusedGeometry,
+            width, height, _gridWidth, _gridHeight, in derived, in parameters, CrystallineGrowthSettings.RenderModeDraw, 0);
+    }
+
+    private int PrepareGeometry(in PixelRect rect, float freeze)
+    {
+        var key = new GeometryKey(_structureGeneration, freeze, rect);
+        if (_geometryKey != key)
+        {
+            ReleaseGeometry();
+            _geometryKey = key;
+            _geometryStage = GeometryStage.Drawn;
+            return CrystallineGrowthSettings.RenderModeDraw;
+        }
+
+        switch (_geometryStage)
+        {
+            case GeometryStage.Drawn:
+                _geometryStage = GeometryStage.Counting;
+                return CrystallineGrowthSettings.RenderModeCount;
+            case GeometryStage.Counted:
+                AllocateGeometry(in rect, _shadedCount);
+                _geometryStage = GeometryStage.Storing;
+                return CrystallineGrowthSettings.RenderModeStore;
+            case GeometryStage.Stored:
+                return CrystallineGrowthSettings.RenderModeCached;
+            default:
+                return CrystallineGrowthSettings.RenderModeDraw;
+        }
+    }
+
+    private void ResolveGeometry(int shadedCount)
+    {
+        if (_geometryStage == GeometryStage.Counting)
+        {
+            _shadedCount = shadedCount;
+            _geometryStage = GeometryStage.Counted;
+        }
+        else if (_geometryStage == GeometryStage.Storing)
+        {
+            if (shadedCount <= _geometryCapacity)
+            {
+                _geometryStage = GeometryStage.Stored;
+            }
+            else
+            {
+                _shadedCount = shadedCount;
+                _geometryStage = GeometryStage.Counted;
+            }
+        }
+    }
+
+    private void AllocateGeometry(in PixelRect rect, int shadedCount)
+    {
+        ReleaseGeometry();
+        var tiles = CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width) / CrystallineGrowthSettings.RenderTileSize
+            * (CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height) / CrystallineGrowthSettings.RenderTileSize);
+        _tileBase = _device.AllocateReadWriteBuffer<int>(tiles);
+        _tileMask = _device.AllocateReadWriteBuffer<int>(tiles * 2);
+        _geometry = _device.AllocateReadWriteBuffer<float>(Math.Max(shadedCount, 1) * 3);
+        _geometryCapacity = shadedCount;
+    }
+
+    private void ReleaseGeometry()
+    {
+        _tileBase?.Dispose();
+        _tileMask?.Dispose();
+        _geometry?.Dispose();
+        _tileBase = null;
+        _tileMask = null;
+        _geometry = null;
+        _geometryCapacity = 0;
     }
 
     private void BuildBoundsPrefix()
@@ -396,6 +490,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _cachedMaxBirth = -1;
         _cachedAttached = 0;
         _structureKey = null;
+        _geometryKey = null;
+        ReleaseGeometry();
         _gridWidth = 0;
         _gridHeight = 0;
     }
@@ -413,6 +509,9 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _packedHeight = 0;
         _scratchReadBack.Dispose();
         _scratch.Dispose();
+        _unusedTileBase.Dispose();
+        _unusedTileMask.Dispose();
+        _unusedGeometry.Dispose();
     }
 
     internal readonly record struct PixelRect(int X, int Y, int Width, int Height);
@@ -430,6 +529,20 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         float Branching,
         float Facet,
         float Noise);
+
+    private readonly record struct GeometryKey(
+        int StructureGeneration,
+        float Freeze,
+        PixelRect Rect);
+
+    private enum GeometryStage
+    {
+        Drawn,
+        Counting,
+        Counted,
+        Storing,
+        Stored,
+    }
 
     internal readonly record struct DerivedValues(
         float CellSize,

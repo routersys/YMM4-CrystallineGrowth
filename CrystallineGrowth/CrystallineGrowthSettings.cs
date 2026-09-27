@@ -37,6 +37,7 @@ internal static class CrystallineGrowthSettings
     public const int GrowthStepsPerSubmission = 128;
     public const int GrowthGroupWidth = 32;
     public const int GrowthGroupHeight = 2;
+    public const int RenderTileSize = 8;
 
     public static QualitySettings GetQuality(CrystallineGrowthQuality quality)
         => quality switch
@@ -54,6 +55,9 @@ internal static class CrystallineGrowthSettings
         var gridHeight = Math.Max((int)Math.Ceiling(height / (cellSize * RowStep)) + 1, MinimumGridSize);
         return (gridWidth, gridHeight, cellSize);
     }
+
+    public static int RoundUpToRenderTile(int length)
+        => (length + RenderTileSize - 1) / RenderTileSize * RenderTileSize;
 
     public static int GetStepCount(float reachCells, int maxSteps)
         => Math.Clamp((int)(reachCells * StepsPerCell) + 128, 192, maxSteps);

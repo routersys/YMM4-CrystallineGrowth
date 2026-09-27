@@ -576,7 +576,7 @@ internal readonly partial struct RenderMassShader(
     }
 }
 
-[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[ThreadGroupSize(CrystallineGrowthSettings.RenderTileSize, CrystallineGrowthSettings.RenderTileSize, 1)]
 [GeneratedComputeShaderDescriptor]
 internal readonly partial struct RenderShader(
     ReadWriteBuffer<float> renderMass,
@@ -621,16 +621,43 @@ internal readonly partial struct RenderShader(
     private readonly float colorG = colorG;
     private readonly float colorB = colorB;
 
+    [GroupShared(1)]
+    private static readonly int[] tileLit = null!;
+
     public void Execute()
     {
-        if (ThreadIds.X >= rectWidth || ThreadIds.Y >= rectHeight)
-            return;
-        var px = ThreadIds.X + rectOffsetX + 0.5f;
-        var py = ThreadIds.Y + rectOffsetY + 0.5f;
-
         var kernelRadius = CrystallineGrowthSettings.KernelRadiusFactor * cellSize;
         var inverseRadiusSquared = 1f / (kernelRadius * kernelRadius);
         var rowStep = cellSize * CrystallineGrowthSettings.RowStep;
+        if (GroupIds.Index == 0)
+            tileLit[0] = 0;
+        Hlsl.GroupMemoryBarrierWithGroupSync();
+
+        var tileLeft = ThreadIds.X - GroupIds.X + rectOffsetX + 0.5f;
+        var tileTop = ThreadIds.Y - GroupIds.Y + rectOffsetY + 0.5f;
+        var tileSpan = CrystallineGrowthSettings.RenderTileSize - 1;
+        var tileJ0 = Hlsl.Max((int)Hlsl.Floor((tileTop - kernelRadius) / rowStep - 0.5f) - 1, 0);
+        var tileJ1 = Hlsl.Min((int)Hlsl.Ceil((tileTop + tileSpan + kernelRadius) / rowStep - 0.5f) + 1, gridHeight - 1);
+        var tileI0 = Hlsl.Max((int)Hlsl.Floor((tileLeft - kernelRadius) / cellSize - 1f) - 1, 0);
+        var tileI1 = Hlsl.Min((int)Hlsl.Ceil((tileLeft + tileSpan + kernelRadius) / cellSize - 0.5f) + 1, gridWidth - 1);
+        var tileWidth = Hlsl.Max(tileI1 - tileI0 + 1, 0);
+        var tileCells = tileWidth * Hlsl.Max(tileJ1 - tileJ0 + 1, 0);
+        for (var slot = GroupIds.Index; slot < tileCells; slot += CrystallineGrowthSettings.RenderTileSize * CrystallineGrowthSettings.RenderTileSize)
+        {
+            if (renderMass[(tileJ0 + slot / tileWidth) * gridWidth + tileI0 + slot % tileWidth] > 0f)
+                Hlsl.InterlockedOr(ref tileLit[0], 1);
+        }
+        Hlsl.GroupMemoryBarrierWithGroupSync();
+
+        if (ThreadIds.X >= rectWidth || ThreadIds.Y >= rectHeight)
+            return;
+        if (tileLit[0] == 0)
+        {
+            output[ThreadIds.XY] = new Float4(0f, 0f, 0f, 0f);
+            return;
+        }
+        var px = ThreadIds.X + rectOffsetX + 0.5f;
+        var py = ThreadIds.Y + rectOffsetY + 0.5f;
         var j0 = Hlsl.Max((int)Hlsl.Floor((py - kernelRadius) / rowStep - 0.5f), 0);
         var j1 = Hlsl.Min((int)Hlsl.Ceil((py + kernelRadius) / rowStep - 0.5f), gridHeight - 1);
 

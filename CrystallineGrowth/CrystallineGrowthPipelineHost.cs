@@ -360,7 +360,7 @@ internal sealed partial class CrystallineGrowthPipelineHost
         context.For(gridLength, new RenderMassShader(
             birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
         context.Barrier(grid.RenderMass);
-        context.For(rect.Width, rect.Height, new RenderShader(
+        context.For(CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width), CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height), new RenderShader(
             grid.RenderMass, source, output,
             rect.X, rect.Y, rect.Width, rect.Height, gridWidth, gridHeight,
             sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,

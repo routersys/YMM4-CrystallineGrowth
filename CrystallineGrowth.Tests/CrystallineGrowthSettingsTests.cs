@@ -15,6 +15,16 @@ public sealed class CrystallineGrowthSettingsTests
     }
 
     [Theory]
+    [InlineData(1, 8)]
+    [InlineData(8, 8)]
+    [InlineData(9, 16)]
+    [InlineData(1228, 1232)]
+    public void TheRenderRangeIsRoundedUpToWholeTiles(int length, int expected)
+    {
+        Assert.Equal(expected, CrystallineGrowthSettings.RoundUpToRenderTile(length));
+    }
+
+    [Theory]
     [InlineData(1920, 1080, 288)]
     [InlineData(1080, 1920, 288)]
     [InlineData(8, 8, 288)]

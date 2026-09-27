@@ -376,19 +376,38 @@ internal sealed partial class CrystallineGrowthPipelineHost
         int mode,
         int geometryCapacity)
     {
-        if (mode != CrystallineGrowthSettings.RenderModeCached)
+        if (mode == CrystallineGrowthSettings.RenderModeCached)
         {
-            var gridLength = gridWidth * gridHeight;
-            context.For(gridLength, new RenderMassShader(
-                birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
-            context.Barrier(grid.RenderMass);
+            context.For(rect.Width, rect.Height, new CachedRenderShader(
+                tileBase, tileMask, geometry, source, output,
+                rect.X, rect.Y, rect.Width, rect.Height,
+                sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,
+                Math.Clamp(parameters.Frost, 0f, 1f), derived.RefractionPixels,
+                Math.Clamp(parameters.Specular, 0f, 1f),
+                parameters.ColorR, parameters.ColorG, parameters.ColorB));
+            return;
         }
-        if (mode == CrystallineGrowthSettings.RenderModeCount || mode == CrystallineGrowthSettings.RenderModeStore)
+
+        var gridLength = gridWidth * gridHeight;
+        context.For(gridLength, new RenderMassShader(
+            birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
+        context.Barrier(grid.RenderMass);
+        if (mode == CrystallineGrowthSettings.RenderModeDraw)
         {
-            context.For(1, new ShadedCountResetShader(scratch));
-            context.Barrier(scratch);
+            context.For(CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width), CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height), new RenderShader(
+                grid.RenderMass, source, output,
+                rect.X, rect.Y, rect.Width, rect.Height, gridWidth, gridHeight,
+                sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,
+                derived.CellSize,
+                Math.Clamp(parameters.Frost, 0f, 1f), derived.RefractionPixels,
+                Math.Clamp(parameters.Specular, 0f, 1f),
+                parameters.ColorR, parameters.ColorG, parameters.ColorB));
+            return;
         }
-        context.For(CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width), CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height), new RenderShader(
+
+        context.For(1, new ShadedCountResetShader(scratch));
+        context.Barrier(scratch);
+        context.For(CrystallineGrowthSettings.RoundUpToRenderTile(rect.Width), CrystallineGrowthSettings.RoundUpToRenderTile(rect.Height), new RenderStoreShader(
             grid.RenderMass, scratch, tileBase, tileMask, geometry, source, output,
             rect.X, rect.Y, rect.Width, rect.Height, gridWidth, gridHeight,
             sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,

@@ -1,4 +1,7 @@
+using System.Globalization;
 using System.Windows.Media;
+using YukkuriMovieMaker.Commons;
+using YukkuriMovieMaker.Json;
 
 namespace CrystallineGrowth.Harness;
 
@@ -52,8 +55,12 @@ internal static class HarnessCases
         yield return ("default", Create());
         yield return ("quality-ultra", Create(effect => effect.Quality = CrystallineGrowthQuality.Ultra));
         yield return ("reach-100", Create(effect => effect.Reach.Values[0].Value = 100));
+        yield return ("freeze-animated", Create(effect => effect.Freeze.CopyFrom(Linear(50d, 100d))));
         yield return ("amount-0", Create(effect => effect.Amount.Values[0].Value = 0));
     }
+
+    static Animation Linear(double from, double to)
+        => Json.LoadFromText<Animation>(string.Create(CultureInfo.InvariantCulture, $$"""{"AnimationType":"直線移動","Values":[{"Value":{{from}}},{"Value":{{to}}}]}""")) ?? throw new HarnessException("アニメーションを読み込めません。");
 
     public static CrystallineGrowthEffect Create(Action<CrystallineGrowthEffect>? configure = null)
     {

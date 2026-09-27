@@ -56,6 +56,7 @@ internal static class HarnessCases
         yield return ("quality-ultra", Create(effect => effect.Quality = CrystallineGrowthQuality.Ultra));
         yield return ("reach-100", Create(effect => effect.Reach.Values[0].Value = 100));
         yield return ("freeze-animated", Create(effect => effect.Freeze.CopyFrom(Linear(50d, 100d))));
+        yield return ("frost-animated", Create(effect => effect.Frost.CopyFrom(Linear(0d, 100d))));
         yield return ("amount-0", Create(effect => effect.Amount.Values[0].Value = 0));
     }
 

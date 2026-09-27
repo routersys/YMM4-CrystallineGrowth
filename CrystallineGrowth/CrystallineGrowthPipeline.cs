@@ -39,7 +39,7 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         _boundsMaxY = new int[CrystallineGrowthSettings.MaximumStepCount + 1];
     }
 
-    internal ContentHash SourceHash { get; private set; }
+    internal ContentHash? SourceHash { get; private set; }
 
     public static CrystallineGrowthPipeline? TryCreate()
     {
@@ -121,12 +121,17 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         int sourceOffsetY,
         int sourceWidth,
         int sourceHeight,
-        in Parameters parameters)
+        in Parameters parameters,
+        bool hashSource)
     {
         var derived = BeginSimulate(canvasWidth, canvasHeight, in parameters);
-        _host.RecordSilhouetteAndHashes(
-            source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived).Wait();
-        return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived);
+        var hashed = hashSource
+            ? _host.RecordSilhouetteAndHashes(
+                source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived)
+            : _host.RecordSilhouetteAndMaskHash(
+                source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived);
+        hashed.Wait();
+        return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived, hashSource);
     }
 
     internal bool Simulate(
@@ -137,12 +142,17 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         int sourceOffsetY,
         int sourceWidth,
         int sourceHeight,
-        in Parameters parameters)
+        in Parameters parameters,
+        bool hashSource)
     {
         var derived = BeginSimulate(canvasWidth, canvasHeight, in parameters);
-        _host.RecordSharedSilhouetteAndHashes(
-            source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived).Wait();
-        return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived);
+        var hashed = hashSource
+            ? _host.RecordSharedSilhouetteAndHashes(
+                source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived)
+            : _host.RecordSharedSilhouetteAndMaskHash(
+                source, _scratch, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, _gridWidth, _gridHeight, in derived);
+        hashed.Wait();
+        return CompleteSimulate(canvasWidth, canvasHeight, in parameters, in derived, hashSource);
     }
 
     private DerivedValues BeginSimulate(int canvasWidth, int canvasHeight, in Parameters parameters)
@@ -151,11 +161,13 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
         return Derive(canvasWidth, canvasHeight, in parameters);
     }
 
-    private bool CompleteSimulate(int canvasWidth, int canvasHeight, in Parameters parameters, in DerivedValues derived)
+    private bool CompleteSimulate(int canvasWidth, int canvasHeight, in Parameters parameters, in DerivedValues derived, bool hashSource)
     {
         _scratchReadBack.CopyFrom(_scratch);
         var hashed = _scratchReadBack.Span;
-        SourceHash = new ContentHash(hashed[CrystallineGrowthSettings.ScratchSourceHashSum], hashed[CrystallineGrowthSettings.ScratchSourceHashMix]);
+        SourceHash = hashSource
+            ? new ContentHash(hashed[CrystallineGrowthSettings.ScratchSourceHashSum], hashed[CrystallineGrowthSettings.ScratchSourceHashMix])
+            : null;
         var key = new StructureKey(
             hashed[CrystallineGrowthSettings.ScratchMaskHashSum],
             hashed[CrystallineGrowthSettings.ScratchMaskHashMix],

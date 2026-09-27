@@ -268,7 +268,7 @@ public sealed class CrystallineGrowthPipelineTests
         using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(192, 192);
         Upload(sourceTexture, source);
 
-        pipeline.Simulate(sourceTexture, 192, 192, 0, 0, 192, 192, in parameters);
+        pipeline.Simulate(sourceTexture, 192, 192, 0, 0, 192, 192, in parameters, hashSource: true);
         Assert.True(pipeline.TryGetVisibleBounds(192, 192, in parameters, out var rect));
         using var outputTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(rect.Width, rect.Height);
         pipeline.RenderVisible(sourceTexture, outputTexture, 192, 192, 0, 0, 192, 192, rect, in parameters);
@@ -301,7 +301,7 @@ public sealed class CrystallineGrowthPipelineTests
         using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(480, 480);
         Upload(sourceTexture, source);
 
-        pipeline.Simulate(sourceTexture, 480, 480, 0, 0, 480, 480, in parameters);
+        pipeline.Simulate(sourceTexture, 480, 480, 0, 0, 480, 480, in parameters, hashSource: true);
         Assert.True(pipeline.TryGetVisibleBounds(480, 480, in parameters, out var rect));
 
         Assert.Equal((0, 0), (rect.X % 4, rect.Y % 4));
@@ -321,7 +321,7 @@ public sealed class CrystallineGrowthPipelineTests
         var full = Parameters(reachPixels: 48f, seed: 5);
         var partial = full with { Freeze = 0.3f };
 
-        pipeline.Simulate(sourceTexture, 192, 192, 0, 0, 192, 192, in full);
+        pipeline.Simulate(sourceTexture, 192, 192, 0, 0, 192, 192, in full, hashSource: true);
         Assert.True(pipeline.TryGetVisibleBounds(192, 192, in full, out var wide));
         Assert.True(pipeline.TryGetVisibleBounds(192, 192, in partial, out var narrow));
 
@@ -341,7 +341,7 @@ public sealed class CrystallineGrowthPipelineTests
         Upload(sourceTexture, shaped ? Square(128, 128, 48, 48, 32, 32) : new int[128 * 128]);
         var parameters = Parameters(freeze: freeze);
 
-        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
+        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true);
 
         Assert.False(pipeline.TryGetVisibleBounds(128, 128, in parameters, out _));
     }
@@ -371,19 +371,38 @@ public sealed class CrystallineGrowthPipelineTests
         var red = gray.Select(pixel => pixel == 0 ? 0 : unchecked((int)0xFFFF0000)).ToArray();
         var parameters = Parameters(seed: 3);
         Upload(sourceTexture, gray);
-        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
-        var grayHash = pipeline.SourceHash;
+        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true);
+        var grayHash = Assert.NotNull(pipeline.SourceHash);
 
         Upload(sourceTexture, red);
-        var grewAgain = pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
-        var redHash = pipeline.SourceHash;
+        var grewAgain = pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true);
+        var redHash = Assert.NotNull(pipeline.SourceHash);
         Upload(sourceTexture, gray);
-        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters);
+        pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true);
 
         Assert.False(grewAgain);
         Assert.NotEqual(grayHash.Sum, redHash.Sum);
         Assert.NotEqual(grayHash.Mix, redHash.Mix);
         Assert.Equal(grayHash, pipeline.SourceHash);
+    }
+
+    [Fact]
+    public void TheSourceHashIsLeftUnknownWhenItIsNotAskedFor()
+    {
+        using var pipeline = CreatePipeline();
+        var device = GraphicsDevice.GetDefault();
+        using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(128, 128);
+        Upload(sourceTexture, Square(128, 128, 48, 48, 32, 32));
+        var parameters = Parameters(seed: 3);
+
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: false));
+        Assert.Null(pipeline.SourceHash);
+        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true));
+        Assert.NotNull(pipeline.SourceHash);
+
+        Upload(sourceTexture, Square(128, 128, 32, 32, 32, 32));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: false));
+        Assert.Null(pipeline.SourceHash);
     }
 
     [Fact]
@@ -395,17 +414,17 @@ public sealed class CrystallineGrowthPipelineTests
         Upload(sourceTexture, Square(128, 128, 48, 48, 32, 32));
         var parameters = Parameters(seed: 3);
 
-        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters));
-        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true));
+        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true));
 
         var freezeChanged = parameters with { Freeze = 0.5f };
-        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in freezeChanged));
+        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in freezeChanged, hashSource: true));
 
         var seedChanged = parameters with { Seed = 4 };
-        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged, hashSource: true));
 
         Upload(sourceTexture, Square(128, 128, 32, 32, 32, 32));
-        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged, hashSource: true));
     }
 
     [Fact]
@@ -419,9 +438,9 @@ public sealed class CrystallineGrowthPipelineTests
         var seedChanged = parameters with { Seed = 4 };
         var noiseAdded = seedChanged with { Noise = 0.25f };
 
-        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters));
-        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged));
-        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in noiseAdded));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in parameters, hashSource: true));
+        Assert.False(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in seedChanged, hashSource: true));
+        Assert.True(pipeline.Simulate(sourceTexture, 128, 128, 0, 0, 128, 128, in noiseAdded, hashSource: true));
     }
 
     [Fact]

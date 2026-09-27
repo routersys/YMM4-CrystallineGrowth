@@ -108,6 +108,47 @@ internal sealed partial class CrystallineGrowthPipelineHost
     }
 
     [ComputePipeline]
+    private void RecordSilhouetteAndMaskHash(
+        in ComputeContext context,
+        [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteTexture2D<Bgra32, Float4> source,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
+        int sourceOffsetX,
+        int sourceOffsetY,
+        int sourceWidth,
+        int sourceHeight,
+        int gridWidth,
+        int gridHeight,
+        in CrystallineGrowthPipeline.DerivedValues derived)
+    {
+        _ = _device;
+
+        RecordSilhouetteStage(in context, grid, source, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived);
+        RecordMaskHashStage(in context, grid, scratch, gridWidth, gridHeight);
+    }
+
+    [ComputePipeline]
+    [ComputeInterop]
+    private void RecordSharedSilhouetteAndMaskHash(
+        in ComputeContext context,
+        [ComputeOwnedResource(nameof(_grid))] CrystallineGrowthGridResources grid,
+        [ComputeResource(ComputeResourceAccess.ReadWrite, Sharing = ComputeResourceSharing.External)] ReadWriteTexture2D<Bgra32, Float4> source,
+        [ComputeResource(ComputeResourceAccess.ReadWrite)] ReadWriteBuffer<int> scratch,
+        int sourceOffsetX,
+        int sourceOffsetY,
+        int sourceWidth,
+        int sourceHeight,
+        int gridWidth,
+        int gridHeight,
+        in CrystallineGrowthPipeline.DerivedValues derived)
+    {
+        _ = _device;
+
+        RecordSilhouetteStage(in context, grid, source, sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight, gridWidth, gridHeight, in derived);
+        RecordMaskHashStage(in context, grid, scratch, gridWidth, gridHeight);
+    }
+
+    [ComputePipeline]
     [ComputeInterop]
     private void RecordSharedRender(
         in ComputeContext context,

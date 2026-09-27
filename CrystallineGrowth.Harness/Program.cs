@@ -234,7 +234,7 @@ static int Structure(HarnessImage image)
     sourceTexture.CopyFrom(pixels);
 
     var parameters = new CrystallineGrowthPipeline.Parameters(CrystallineGrowthQuality.High, 1f, 0.6f, 0.4f, 160f, 0.25f, 0.7f, 0.4f, 0.5f, 0.8f, 0.89f, 1f, 7);
-    pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in parameters);
+    pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in parameters, hashSource: true);
     pipeline.WaitForCompletion();
     var stopwatch = new Stopwatch();
 
@@ -263,7 +263,7 @@ static int Structure(HarnessImage image)
     foreach (var (_, make) in variants)
     {
         var warmup = make(true);
-        pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in warmup);
+        pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in warmup, hashSource: true);
         pipeline.WaitForCompletion();
     }
 
@@ -280,12 +280,12 @@ static int Structure(HarnessImage image)
         foreach (var index in order)
         {
             var settled = variants[index].Make(false);
-            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in settled);
+            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in settled, hashSource: true);
             pipeline.WaitForCompletion();
 
             var measured = variants[index].Make(true);
             stopwatch.Restart();
-            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in measured);
+            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in measured, hashSource: true);
             pipeline.WaitForCompletion();
             stopwatch.Stop();
             samples[index].Add(stopwatch.Elapsed.TotalMilliseconds);
@@ -308,7 +308,7 @@ static int Structure(HarnessImage image)
         stopwatch.Restart();
         for (var frame = 0; frame < RectFrames; frame++)
         {
-            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in parameters);
+            pipeline.Simulate(sourceTexture, image.Width, image.Height, 0, 0, image.Width, image.Height, in parameters, hashSource: true);
             pipeline.TryGetVisibleBounds(image.Width, image.Height, in parameters, out rect);
             pipeline.RenderVisible(sourceTexture, rectOutput, image.Width, image.Height, 0, 0, image.Width, image.Height, rect, in parameters);
         }

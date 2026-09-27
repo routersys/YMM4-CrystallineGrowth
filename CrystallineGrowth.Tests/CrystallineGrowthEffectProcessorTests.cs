@@ -394,6 +394,32 @@ public sealed class CrystallineGrowthEffectProcessorTests
     }
 
     [Fact]
+    public void AnImageRestoredAfterASettingChangeIsDrawnLikeAFreshOne()
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var red = new SourceImage(context, Size, Size, Filled(Red));
+        using var green = new SourceImage(context, Size, Size, Filled(Green));
+        var effect = new CrystallineGrowthEffect();
+        using var processor = effect.CreateVideoEffect(context);
+        processor.SetInput(red.Bitmap);
+        RenderFrame(context, processor, 0);
+        RenderFrame(context, processor, 0);
+        effect.Frost.Values[0].Value = 100d;
+        processor.SetInput(green.Bitmap);
+        RenderFrame(context, processor, 0);
+        using var fresh = effect.CreateVideoEffect(context);
+        fresh.SetInput(red.Bitmap);
+        var expected = RenderFrame(context, fresh, 0);
+
+        processor.SetInput(red.Bitmap);
+        var restored = RenderFrame(context, processor, 0);
+
+        Assert.True(restored.SamePixelsAs(expected));
+    }
+
+    [Fact]
     public void AFailureWhileUpdatingIsNotSwallowed()
     {
         using var devices = new GraphicsDevices();

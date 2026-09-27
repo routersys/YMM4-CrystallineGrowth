@@ -117,7 +117,7 @@ public sealed class CrystallineGrowthInteropTests
         CrystallineGrowthPipeline.PixelRect RenderInto(Func<CrystallineGrowthPipeline.PixelRect, (int Width, int Height)> outputSize)
         {
             interop.Draw(source.Bitmap);
-            interop.Pipeline.Simulate(interop.Resources.GetSourceComputeBinding(), 96, 96, 0, 0, 96, 96, in parameters);
+            interop.Pipeline.Simulate(interop.Resources.GetSourceComputeBinding(), 96, 96, 0, 0, 96, 96, in parameters, hashSource: true);
             Assert.True(interop.Pipeline.TryGetVisibleBounds(96, 96, in parameters, out var visible));
             var (width, height) = outputSize(visible);
             Assert.True(interop.Resources.TryEnsureOutput(width, height, out _));
@@ -149,7 +149,7 @@ public sealed class CrystallineGrowthInteropTests
             using var source = new SourceImage(context, size, size, CenteredSquare(size, square));
             Assert.True(interop.Resources.TryEnsureSource(size, size, out var sourceChanged));
             interop.Draw(source.Bitmap);
-            Assert.True(interop.Pipeline.Simulate(interop.Resources.GetSourceComputeBinding(), size, size, 0, 0, size, size, in parameters));
+            Assert.True(interop.Pipeline.Simulate(interop.Resources.GetSourceComputeBinding(), size, size, 0, 0, size, size, in parameters, hashSource: true));
             Assert.True(interop.Pipeline.TryGetVisibleBounds(size, size, in parameters, out var visible));
             Assert.True(interop.Resources.TryEnsureOutput(visible.Width, visible.Height, out _));
             interop.Pipeline.RenderVisible(interop.Resources.GetSourceComputeBinding(), interop.Resources.GetOutputComputeBinding(), size, size, 0, 0, size, size, visible, in parameters);

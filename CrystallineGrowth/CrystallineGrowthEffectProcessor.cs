@@ -148,6 +148,14 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             parameters.Color.B / 255f,
             Math.Max(parameters.Seed, 0));
 
+        var renderSettings = new RenderSettings(
+            pipelineParameters.Freeze,
+            pipelineParameters.Frost,
+            pipelineParameters.Refraction,
+            pipelineParameters.Specular,
+            pipelineParameters.ColorR,
+            pipelineParameters.ColorG,
+            pipelineParameters.ColorB);
         var structureChanged = _pipeline.Simulate(
             _resourceSet.GetSourceComputeBinding(),
             canvasWidth,
@@ -156,7 +164,8 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             margin,
             itemWidth,
             itemHeight,
-            in pipelineParameters);
+            in pipelineParameters,
+            _hasOutput && _hasRenderState && _renderState.Settings == renderSettings);
 
         if (!_pipeline.TryGetVisibleBounds(canvasWidth, canvasHeight, in pipelineParameters, out var rect))
         {
@@ -177,16 +186,7 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             _hasRenderState = false;
             return effectDescription.DrawDescription;
         }
-        var renderState = new RenderState(
-            pipelineParameters.Freeze,
-            pipelineParameters.Frost,
-            pipelineParameters.Refraction,
-            pipelineParameters.Specular,
-            pipelineParameters.ColorR,
-            pipelineParameters.ColorG,
-            pipelineParameters.ColorB,
-            rect,
-            _pipeline.SourceHash);
+        var renderState = new RenderState(renderSettings, rect, _pipeline.SourceHash);
         if (structureChanged || outputChanged || !_hasOutput || !_hasRenderState || _renderState != renderState)
         {
             _pipeline.RenderVisible(
@@ -429,16 +429,19 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
         }
     }
 
-    private readonly record struct RenderState(
+    private readonly record struct RenderSettings(
         float Freeze,
         float Frost,
         float Refraction,
         float Specular,
         float ColorR,
         float ColorG,
-        float ColorB,
+        float ColorB);
+
+    private readonly record struct RenderState(
+        RenderSettings Settings,
         CrystallineGrowthPipeline.PixelRect Rect,
-        CrystallineGrowthPipeline.ContentHash Source);
+        CrystallineGrowthPipeline.ContentHash? Source);
 
     private readonly record struct Parameters(
         float Amount,

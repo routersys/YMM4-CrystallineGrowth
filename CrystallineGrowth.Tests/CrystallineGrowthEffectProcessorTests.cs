@@ -209,6 +209,30 @@ public sealed class CrystallineGrowthEffectProcessorTests
         AssertSameAsSource(rendering, source);
     }
 
+    [Theory]
+    [InlineData(CrystallineGrowthQuality.Balanced, 8000)]
+    [InlineData(CrystallineGrowthQuality.Balanced, 8160)]
+    [InlineData(CrystallineGrowthQuality.High, 8160)]
+    [InlineData(CrystallineGrowthQuality.Ultra, 8160)]
+    public void TheFrostOfAVeryLongImageFadesOutBeforeTheEdgeOfTheCanvas(CrystallineGrowthQuality quality, int width)
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var source = SourceImage.Solid(context, width, 24, Gray);
+        using var processor = new CrystallineGrowthEffect { Quality = quality }.CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+
+        var rendering = RenderFrame(context, processor, 0);
+
+        var litAtTheEdge = rendering.Coordinates()
+            .Where(point => point.X == rendering.Left || point.X == rendering.Right - 1 || point.Y == rendering.Top || point.Y == rendering.Bottom - 1)
+            .Where(point => rendering[point.X, point.Y].Alpha > 0)
+            .ToArray();
+        Assert.True(HasFrostOutside(rendering, source));
+        Assert.Empty(litAtTheEdge);
+    }
+
     [Fact]
     public void ReturningToAFrameReproducesItExactly()
     {

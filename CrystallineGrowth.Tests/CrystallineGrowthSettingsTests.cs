@@ -15,6 +15,45 @@ public sealed class CrystallineGrowthSettingsTests
     }
 
     [Theory]
+    [InlineData(640, 480, 120d, 288, 200)]
+    [InlineData(1920, 1080, 480d, 192, 560)]
+    [InlineData(96, 24, 1d, 288, 81)]
+    public void TheMarginIsTheReachPlusThePaddingWhenTheReachSpansACell(int width, int height, double reachPixels, int resolution, int expected)
+    {
+        Assert.Equal(expected, CrystallineGrowthSettings.GetMargin(width, height, reachPixels, resolution));
+    }
+
+    [Theory]
+    [InlineData(8000, 24, 16d, 192)]
+    [InlineData(8100, 24, 1d, 192)]
+    [InlineData(8160, 8160, 1d, 192)]
+    [InlineData(8100, 24, 1d, 288)]
+    [InlineData(8160, 24, 1d, 384)]
+    [InlineData(96, 24, 1d, 192)]
+    public void AReachShorterThanACellTakesTheMarginOfOneCell(int width, int height, double reachPixels, int resolution)
+    {
+        var margin = CrystallineGrowthSettings.GetMargin(width, height, reachPixels, resolution);
+
+        var (_, _, cellSize) = CrystallineGrowthSettings.GetGridSize(width + margin * 2, height + margin * 2, resolution);
+        Assert.True(reachPixels < cellSize);
+        Assert.Equal((int)Math.Ceiling(cellSize + CrystallineGrowthSettings.MarginPadding), margin);
+    }
+
+    [Theory]
+    [InlineData(CrystallineGrowthQuality.Balanced, 8408)]
+    [InlineData(CrystallineGrowthQuality.High, 8380)]
+    [InlineData(CrystallineGrowthQuality.Ultra, 8364)]
+    public void TheLongestImageThatIsProcessedGetsTheLargestCanvas(CrystallineGrowthQuality quality, int expected)
+    {
+        var longSide = CrystallineGrowthSettings.MaximumCanvasSize - 32;
+        var resolution = CrystallineGrowthSettings.GetQuality(quality).GridResolution;
+
+        var margin = CrystallineGrowthSettings.GetMargin(longSide, longSide, 1d, resolution);
+
+        Assert.Equal(expected, longSide + margin * 2);
+    }
+
+    [Theory]
     [InlineData(1, 8)]
     [InlineData(8, 8)]
     [InlineData(9, 16)]

@@ -108,9 +108,9 @@ internal sealed class CrystallineGrowthEffectProcessor : VideoEffectProcessorBas
             _isFirst = true;
             return effectDescription.DrawDescription;
         }
-        var padding = (double)CrystallineGrowthSettings.MarginPadding;
-        var reachPixels = Math.Min(reach * longSide, Math.Max(marginLimit - padding, 1d));
-        var margin = (int)Math.Ceiling(reachPixels + padding);
+        var reachPixels = Math.Min(reach * longSide, Math.Max(marginLimit - CrystallineGrowthSettings.MarginPadding, 1d));
+        var margin = CrystallineGrowthSettings.GetMargin(
+            (int)widthValue, (int)heightValue, reachPixels, CrystallineGrowthSettings.GetQuality(parameters.Quality).GridResolution);
         var canvasWidthValue = widthValue + margin * 2d;
         var canvasHeightValue = heightValue + margin * 2d;
         if (canvasWidthValue * canvasHeightValue > int.MaxValue)

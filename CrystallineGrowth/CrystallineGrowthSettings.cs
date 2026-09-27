@@ -61,6 +61,19 @@ internal static class CrystallineGrowthSettings
         return (gridWidth, gridHeight, cellSize);
     }
 
+    public static int GetMargin(int itemWidth, int itemHeight, double reachPixels, int gridResolution)
+    {
+        var margin = (int)Math.Ceiling(reachPixels + MarginPadding);
+        while (true)
+        {
+            var (_, _, cellSize) = GetGridSize(itemWidth + margin * 2, itemHeight + margin * 2, gridResolution);
+            var required = (int)Math.Ceiling(Math.Max(reachPixels, cellSize) + MarginPadding);
+            if (required <= margin)
+                return margin;
+            margin = required;
+        }
+    }
+
     public static int RoundUpToRenderTile(int length)
         => (length + RenderTileSize - 1) / RenderTileSize * RenderTileSize;
 

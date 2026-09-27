@@ -28,6 +28,9 @@ internal sealed partial class CrystallineGrowthGridResources
 
     [ComputePipelineResource(ComputeResourceAccess.ReadWrite)]
     internal ReadWriteBuffer<float> DiffusiveB { get; }
+
+    [ComputePipelineResource(ComputeResourceAccess.ReadWrite)]
+    internal ReadWriteBuffer<float> RenderMass { get; }
 }
 
 [ComputePipelineHost("_device", 1)]
@@ -312,11 +315,15 @@ internal sealed partial class CrystallineGrowthPipelineHost
         in CrystallineGrowthPipeline.DerivedValues derived,
         in CrystallineGrowthPipeline.Parameters parameters)
     {
+        var gridLength = gridWidth * gridHeight;
+        context.For(gridLength, new RenderMassShader(
+            birth, grid.CrystalMass, scratch, grid.RenderMass, gridLength, Math.Clamp(parameters.Freeze, 0f, 1f)));
+        context.Barrier(grid.RenderMass);
         context.For(rect.Width, rect.Height, new RenderShader(
-            birth, grid.CrystalMass, scratch, source, output,
+            grid.RenderMass, source, output,
             rect.X, rect.Y, rect.Width, rect.Height, gridWidth, gridHeight,
             sourceOffsetX, sourceOffsetY, sourceWidth, sourceHeight,
-            derived.CellSize, Math.Clamp(parameters.Freeze, 0f, 1f),
+            derived.CellSize,
             Math.Clamp(parameters.Frost, 0f, 1f), derived.RefractionPixels,
             Math.Clamp(parameters.Specular, 0f, 1f),
             parameters.ColorR, parameters.ColorG, parameters.ColorB));

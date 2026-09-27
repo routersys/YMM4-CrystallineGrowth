@@ -348,7 +348,8 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
                     jumpFloodALength: gridLength,
                     jumpFloodBLength: gridLength,
                     maskLength: gridLength,
-                    reachMaskLength: gridLength),
+                    reachMaskLength: gridLength,
+                    renderMassLength: gridLength),
                 out _))
             throw new InvalidOperationException();
         _birth = _device.AllocateReadWriteBuffer<int>(gridLength);

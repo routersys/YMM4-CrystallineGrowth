@@ -542,12 +542,44 @@ internal readonly partial struct GrowthUpdateShader(
     }
 }
 
-[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[ThreadGroupSize(DefaultThreadGroupSizes.X)]
 [GeneratedComputeShaderDescriptor]
-internal readonly partial struct RenderShader(
+internal readonly partial struct RenderMassShader(
     ReadWriteBuffer<int> birth,
     ReadWriteBuffer<float> crystalMass,
     ReadWriteBuffer<int> scratch,
+    ReadWriteBuffer<float> renderMass,
+    int gridLength,
+    float freeze) : IComputeShader
+{
+    private readonly ReadWriteBuffer<int> birth = birth;
+    private readonly ReadWriteBuffer<float> crystalMass = crystalMass;
+    private readonly ReadWriteBuffer<int> scratch = scratch;
+    private readonly ReadWriteBuffer<float> renderMass = renderMass;
+    private readonly int gridLength = gridLength;
+    private readonly float freeze = freeze;
+
+    public void Execute()
+    {
+        var index = ThreadIds.X;
+        if (index >= gridLength)
+            return;
+        var visible = freeze * (scratch[1] + 1);
+        var cellBirth = birth[index];
+        var mass = 0f;
+        if (cellBirth < CrystallineGrowthSettings.BirthSentinel)
+        {
+            var fade = Hlsl.Saturate(visible - cellBirth);
+            mass = fade * (0.55f + 0.45f * Hlsl.Saturate(crystalMass[index] * CrystallineGrowthSettings.MassScale));
+        }
+        renderMass[index] = mass;
+    }
+}
+
+[ThreadGroupSize(DefaultThreadGroupSizes.XY)]
+[GeneratedComputeShaderDescriptor]
+internal readonly partial struct RenderShader(
+    ReadWriteBuffer<float> renderMass,
     ReadWriteTexture2D<Bgra32, Float4> source,
     ReadWriteTexture2D<Bgra32, Float4> output,
     int rectOffsetX,
@@ -561,7 +593,6 @@ internal readonly partial struct RenderShader(
     int sourceWidth,
     int sourceHeight,
     float cellSize,
-    float freeze,
     float frost,
     float refractionPixels,
     float specular,
@@ -569,9 +600,7 @@ internal readonly partial struct RenderShader(
     float colorG,
     float colorB) : IComputeShader
 {
-    private readonly ReadWriteBuffer<int> birth = birth;
-    private readonly ReadWriteBuffer<float> crystalMass = crystalMass;
-    private readonly ReadWriteBuffer<int> scratch = scratch;
+    private readonly ReadWriteBuffer<float> renderMass = renderMass;
     private readonly ReadWriteTexture2D<Bgra32, Float4> source = source;
     private readonly ReadWriteTexture2D<Bgra32, Float4> output = output;
     private readonly int rectOffsetX = rectOffsetX;
@@ -585,7 +614,6 @@ internal readonly partial struct RenderShader(
     private readonly int sourceWidth = sourceWidth;
     private readonly int sourceHeight = sourceHeight;
     private readonly float cellSize = cellSize;
-    private readonly float freeze = freeze;
     private readonly float frost = frost;
     private readonly float refractionPixels = refractionPixels;
     private readonly float specular = specular;
@@ -599,7 +627,6 @@ internal readonly partial struct RenderShader(
             return;
         var px = ThreadIds.X + rectOffsetX + 0.5f;
         var py = ThreadIds.Y + rectOffsetY + 0.5f;
-        var visible = freeze * (scratch[1] + 1);
 
         var kernelRadius = CrystallineGrowthSettings.KernelRadiusFactor * cellSize;
         var inverseRadiusSquared = 1f / (kernelRadius * kernelRadius);
@@ -631,14 +658,7 @@ internal readonly partial struct RenderShader(
                 var oneMinusU = 1f - u;
                 var weight = oneMinusU * oneMinusU;
                 var weightGradientScale = -4f * oneMinusU * inverseRadiusSquared;
-                var index = j * gridWidth + i;
-                var cellBirth = birth[index];
-                var mass = 0f;
-                if (cellBirth < CrystallineGrowthSettings.BirthSentinel)
-                {
-                    var fade = Hlsl.Saturate(visible - cellBirth);
-                    mass = fade * (0.55f + 0.45f * Hlsl.Saturate(crystalMass[index] * CrystallineGrowthSettings.MassScale));
-                }
+                var mass = renderMass[j * gridWidth + i];
                 num += weight * mass;
                 den += weight;
                 numX += weightGradientScale * dx * mass;

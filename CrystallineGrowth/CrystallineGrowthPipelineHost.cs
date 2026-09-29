@@ -282,7 +282,10 @@ internal sealed partial class CrystallineGrowthPipelineHost
     {
         context.For(1, new SourceHashResetShader(scratch));
         context.Barrier(scratch);
-        context.For(sourceWidth, sourceHeight, new SourceHashShader(source, scratch, sourceWidth, sourceHeight));
+        context.For(
+            ThreadGroupAlignment.AlignX<SourceHashShader>(sourceWidth),
+            ThreadGroupAlignment.AlignY<SourceHashShader>(sourceHeight),
+            new SourceHashShader(source, scratch, sourceWidth, sourceHeight));
         context.Barrier(scratch);
     }
 

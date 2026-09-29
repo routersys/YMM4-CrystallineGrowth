@@ -449,6 +449,30 @@ public sealed class CrystallineGrowthPipelineTests
         Assert.Null(pipeline.SourceHash);
     }
 
+    [Theory]
+    [InlineData(100, 64)]
+    [InlineData(64, 60)]
+    public void RecoloringOnlyTheLastPixelChangesTheSourceHashAtAnySize(int width, int height)
+    {
+        using var pipeline = CreatePipeline();
+        var device = GraphicsDevice.GetDefault();
+        using var sourceTexture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(width, height);
+        var gray = Square(width, height, 0, 0, width, height);
+        var recolored = gray.ToArray();
+        recolored[^1] = unchecked((int)0xFFFF0000);
+        var parameters = Parameters(seed: 3);
+        Upload(sourceTexture, gray);
+        pipeline.Simulate(sourceTexture, width, height, 0, 0, width, height, in parameters, hashSource: true);
+        var grayHash = Assert.NotNull(pipeline.SourceHash);
+
+        Upload(sourceTexture, recolored);
+        pipeline.Simulate(sourceTexture, width, height, 0, 0, width, height, in parameters, hashSource: true);
+        var recoloredHash = Assert.NotNull(pipeline.SourceHash);
+
+        Assert.NotEqual(grayHash.Sum, recoloredHash.Sum);
+        Assert.NotEqual(grayHash.Mix, recoloredHash.Mix);
+    }
+
     [Fact]
     public void TheGrowthIsSimulatedAgainOnlyWhenTheShapeOrTheGrowthSettingsChange()
     {

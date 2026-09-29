@@ -250,6 +250,25 @@ public sealed class CrystallineGrowthEffectProcessorTests
         Assert.True(first.SamePixelsAs(again));
     }
 
+    [Theory]
+    [InlineData(60, 64)]
+    [InlineData(64, 36)]
+    public void AnImageOfAnySizeIsDrawnTheSameOnTheNextFrame(int width, int height)
+    {
+        using var devices = new GraphicsDevices();
+        using var context = devices.CreateContext();
+        RequireInterop(context);
+        using var source = SourceImage.Solid(context, width, height, Gray);
+        using var processor = new CrystallineGrowthEffect().CreateVideoEffect(context);
+        processor.SetInput(source.Bitmap);
+
+        var first = RenderFrame(context, processor, 0);
+        var next = RenderFrame(context, processor, 1);
+
+        Assert.True(HasFrostOutside(first, source));
+        Assert.True(first.SamePixelsAs(next));
+    }
+
     [Fact]
     public void ANewProcessorDrawsTheSameFrost()
     {

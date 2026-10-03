@@ -202,6 +202,25 @@ public sealed class CrystallineGrowthPipelineTests
     }
 
     [Fact]
+    public void AReclaimedGridIsSimulatedAgain()
+    {
+        using var pipeline = CreatePipeline();
+        var parameters = Parameters();
+        var device = GraphicsDevice.GetDefault();
+        using var texture = device.AllocateReadWriteTexture2D<Bgra32, Float4>(64, 64);
+        Upload(texture, Square(64, 64, 16, 16, 32, 32));
+
+        var first = pipeline.Simulate(texture, 64, 64, 0, 0, 64, 64, in parameters, hashSource: true);
+        var repeated = pipeline.Simulate(texture, 64, 64, 0, 0, 64, 64, in parameters, hashSource: true);
+        device.TrimMemory();
+        var reclaimed = pipeline.Simulate(texture, 64, 64, 0, 0, 64, 64, in parameters, hashSource: true);
+
+        Assert.True(first);
+        Assert.False(repeated);
+        Assert.True(reclaimed);
+    }
+
+    [Fact]
     public void AWarmPipelineAllocatesNoManagedMemory()
     {
         using var pipeline = CreatePipeline();

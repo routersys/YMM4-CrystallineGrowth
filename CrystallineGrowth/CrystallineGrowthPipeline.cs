@@ -440,10 +440,10 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
 
     private void EnsureGrid(int gridWidth, int gridHeight)
     {
-        if (_gridWidth == gridWidth && _gridHeight == gridHeight)
-            return;
+        var resized = _gridWidth != gridWidth || _gridHeight != gridHeight;
+        if (resized)
+            DisposeGridBuffers();
 
-        DisposeGridBuffers();
         var gridLength = gridWidth * gridHeight;
         if (!_host.TryEnsureGrid(
                 new CrystallineGrowthGridResources.Plan(
@@ -456,8 +456,20 @@ internal sealed class CrystallineGrowthPipeline : IDisposable
                     maskLength: gridLength,
                     reachMaskLength: gridLength,
                     renderMassLength: gridLength),
-                out _))
+                out var changed))
             throw new InvalidOperationException();
+
+        if (!resized)
+        {
+            if (changed)
+            {
+                _structureKey = null;
+                _geometryKey = null;
+                ReleaseGeometry();
+            }
+            return;
+        }
+
         _birth = _device.AllocateReadWriteBuffer<int>(gridLength);
         _birthReadBack = _device.AllocateReadBackBuffer<int>(gridLength);
         _cachedBirth = new int[gridLength];
